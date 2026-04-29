@@ -5,12 +5,16 @@ import time
 from typing import Optional
 
 import yaml
+from rich.console import Console
 
 from ecoacoustics.audio.capture import AudioCapture
 from ecoacoustics.audio.processor import AudioProcessor
 from ecoacoustics.classifiers import REGISTRY, BaseClassifier
+from ecoacoustics.clip_manager import ClipManager
 from ecoacoustics.output.logger import DetectionLogger
 from ecoacoustics.session import Session
+
+_console = Console()
 
 
 class Pipeline:
@@ -19,15 +23,27 @@ class Pipeline:
             self._cfg = yaml.safe_load(f)
 
         self._classifiers: list[BaseClassifier] = self._build_classifiers()
+
         bird_cfg = self._cfg.get("bird", {})
+        out_cfg = self._cfg.get("output", {})
+
         self._logger = DetectionLogger(
-            console=self._cfg["output"].get("console", True),
-            detections_csv=self._cfg["output"].get("detections_csv"),
-            sessions_csv=self._cfg["output"].get("sessions_csv"),
-            min_confidence=self._cfg["output"].get("min_confidence", 0.0),
+            console=out_cfg.get("console", True),
+            detections_csv=out_cfg.get("detections_csv"),
+            sessions_csv=out_cfg.get("sessions_csv"),
+            min_confidence=out_cfg.get("min_confidence", 0.0),
             latitude=bird_cfg.get("latitude"),
             longitude=bird_cfg.get("longitude"),
         )
+
+        clips_cfg = self._cfg.get("clips", {})
+        self._clip_manager = ClipManager(
+            clips_dir=clips_cfg.get("dir", "output/clips"),
+            species_db_path=clips_cfg.get("species_db", "output/known_species.json"),
+            max_clips_per_species=clips_cfg.get("max_per_species", 100),
+            min_confidence=out_cfg.get("min_confidence", 0.35),
+        )
+
         self._stop_event = threading.Event()
         self._captures: dict[int, AudioCapture] = {}
         self._processors: dict[str, AudioProcessor] = {}
@@ -55,10 +71,6 @@ class Pipeline:
         return self._cfg
 
     def run(self, window_name: str = "manual", duration_seconds: Optional[float] = None) -> Session:
-        """
-        Listen and classify until Ctrl+C or duration_seconds elapses.
-        Returns the completed Session.
-        """
         self._stop_event.clear()
 
         if duration_seconds:
@@ -69,17 +81,15 @@ class Pipeline:
         signal.signal(signal.SIGINT, self._handle_sigint)
         signal.signal(signal.SIGTERM, self._handle_sigint)
 
-        session = Session(window_name=window_name)
-
         for clf in self._classifiers:
             clf.load()
 
         for capture in self._captures.values():
             capture.start()
 
-        from rich.console import Console
+        session = Session(window_name=window_name)
         dur_str = f" for {duration_seconds/60:.0f} min" if duration_seconds else ""
-        Console().print(
+        _console.print(
             f"\n[bold green]Listening[/bold green] — window: [cyan]{window_name}[/cyan]{dur_str}\n"
             f"Classifiers: {[c.name for c in self._classifiers]}   "
             f"Press Ctrl+C to stop.\n"
@@ -94,6 +104,8 @@ class Pipeline:
 
         for capture in self._captures.values():
             capture.stop()
+        for clf in self._classifiers:
+            clf.cleanup()
 
         session.close()
         self._logger.write_session_summary(session)
@@ -117,11 +129,26 @@ class Pipeline:
             try:
                 processed = processor.process(chunk)
                 detections = clf.classify(processed)
-                if detections:
-                    self._logger.log(detections, session)
+                if not detections:
+                    continue
+
+                self._logger.log(detections, session)
+
+                for det in detections:
+                    saved_path, is_new = self._clip_manager.process(
+                        det, processed.data, processed.sample_rate
+                    )
+                    if is_new:
+                        _console.print(
+                            f"\n[bold yellow] NEW SPECIES DETECTED: "
+                            f"{det.label} ({det.metadata.get('scientific_name', '')}) "
+                            f"— conf {det.confidence:.0%}[/bold yellow]\n"
+                        )
+                    elif saved_path:
+                        _console.print(f"[dim]  clip saved → {saved_path.name}[/dim]")
+
             except Exception as exc:
-                from rich.console import Console
-                Console().print(f"[red][{clf.name}] error: {exc}[/red]")
+                _console.print(f"[red][{clf.name}] error: {exc}[/red]")
 
     def _build_classifiers(self) -> list[BaseClassifier]:
         active = self._cfg["classifiers"]["active"]
@@ -133,6 +160,5 @@ class Pipeline:
         return result
 
     def _handle_sigint(self, *_) -> None:
-        from rich.console import Console
-        Console().print("\n[yellow]Stopping...[/yellow]")
+        _console.print("\n[yellow]Stopping...[/yellow]")
         self._stop_event.set()

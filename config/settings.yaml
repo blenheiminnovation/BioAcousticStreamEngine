@@ -64,6 +64,11 @@ schedule:
       - "Common Nightingale"
       - "Song Thrush"
 
+clips:
+  dir: "output/clips"                   # root folder; one sub-folder per species
+  species_db: "output/known_species.json"  # all-time species registry
+  max_per_species: 100                  # rotate out lowest-confidence clips beyond this
+
 output:
   console: true
   detections_csv: "output/detections.csv"   # one row per detection

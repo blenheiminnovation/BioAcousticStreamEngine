@@ -47,3 +47,6 @@ class BaseClassifier(ABC):
 
     def load(self) -> None:
         """Called once at startup to load models/weights into memory."""
+
+    def cleanup(self) -> None:
+        """Called on shutdown to release any resources (temp files, handles)."""
