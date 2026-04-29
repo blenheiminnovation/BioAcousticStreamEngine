@@ -4,9 +4,9 @@ from pathlib import Path
 from typing import Optional
 
 from rich.console import Console
-from rich.table import Table
 
 from ecoacoustics.classifiers.base import Detection
+from ecoacoustics.session import Session
 
 _console = Console()
 
@@ -17,62 +17,122 @@ _CLASSIFIER_COLOURS = {
     "soil": "cyan",
 }
 
+_DETECTION_FIELDS = [
+    "session_id", "window_name", "date", "time",
+    "classifier", "species_common", "species_scientific",
+    "confidence", "call_number_in_session", "latitude", "longitude",
+]
+
+_SESSION_FIELDS = [
+    "session_id", "window_name", "date", "session_start", "session_end",
+    "duration_mins", "species", "total_calls", "max_confidence", "avg_confidence",
+]
+
 
 class DetectionLogger:
     def __init__(
         self,
         console: bool = True,
-        log_file: Optional[str] = None,
+        detections_csv: Optional[str] = None,
+        sessions_csv: Optional[str] = None,
         min_confidence: float = 0.0,
+        latitude: Optional[float] = None,
+        longitude: Optional[float] = None,
     ):
         self._console = console
         self._min_confidence = min_confidence
-        self._csv_path = Path(log_file) if log_file else None
-        self._csv_file = None
-        self._csv_writer = None
+        self._lat = latitude
+        self._lon = longitude
 
-        if self._csv_path:
-            self._csv_path.parent.mkdir(parents=True, exist_ok=True)
-            self._csv_file = open(self._csv_path, "a", newline="")
-            self._csv_writer = csv.writer(self._csv_file)
-            if self._csv_path.stat().st_size == 0:
-                self._csv_writer.writerow(
-                    ["timestamp", "classifier", "label", "confidence", "metadata"]
-                )
+        self._det_writer, self._det_file = self._open_csv(detections_csv, _DETECTION_FIELDS)
+        self._sess_writer, self._sess_file = self._open_csv(sessions_csv, _SESSION_FIELDS)
 
-    def log(self, detections: list[Detection]) -> None:
+    # ------------------------------------------------------------------
+    # Public
+    # ------------------------------------------------------------------
+
+    def log(self, detections: list[Detection], session: Session) -> None:
         for det in detections:
             if det.confidence < self._min_confidence:
                 continue
-            self._write_console(det)
-            self._write_csv(det)
+            call_n = session.record(det)
+            self._write_detection_row(det, session, call_n)
+            self._write_console(det, call_n)
+
+    def write_session_summary(self, session: Session) -> None:
+        if not self._sess_writer:
+            return
+        for row in session.species_rows():
+            self._sess_writer.writerow(row)
+        self._sess_file.flush()
+        if self._console:
+            self._print_session_summary(session)
 
     def close(self) -> None:
-        if self._csv_file:
-            self._csv_file.close()
+        for f in (self._det_file, self._sess_file):
+            if f:
+                f.close()
 
     # ------------------------------------------------------------------
+    # Internal
+    # ------------------------------------------------------------------
 
-    def _write_console(self, det: Detection) -> None:
+    def _write_detection_row(self, det: Detection, session: Session, call_n: int) -> None:
+        if not self._det_writer:
+            return
+        ts = datetime.datetime.fromtimestamp(det.timestamp)
+        self._det_writer.writerow({
+            "session_id": session.session_id,
+            "window_name": session.window_name,
+            "date": ts.strftime("%Y-%m-%d"),
+            "time": ts.strftime("%H:%M:%S"),
+            "classifier": det.classifier,
+            "species_common": det.label,
+            "species_scientific": det.metadata.get("scientific_name", ""),
+            "confidence": f"{det.confidence:.3f}",
+            "call_number_in_session": call_n,
+            "latitude": self._lat or "",
+            "longitude": self._lon or "",
+        })
+        self._det_file.flush()
+
+    def _write_console(self, det: Detection, call_n: int) -> None:
         if not self._console:
             return
         colour = _CLASSIFIER_COLOURS.get(det.classifier, "white")
         ts = datetime.datetime.fromtimestamp(det.timestamp).strftime("%H:%M:%S")
+        sci = det.metadata.get("scientific_name", "")
         _console.print(
-            f"[dim]{ts}[/dim]  [{colour}]{det.classifier:8}[/{colour}]  "
-            f"[bold]{det.label}[/bold]  [dim]{det.confidence:.0%}[/dim]"
+            f"[dim]{ts}[/dim]  [{colour}]{det.label:<30}[/{colour}]"
+            f"[dim]{sci:<35}[/dim]"
+            f"conf [bold]{det.confidence:.0%}[/bold]  "
+            f"call #{call_n}"
         )
 
-    def _write_csv(self, det: Detection) -> None:
-        if not self._csv_writer:
+    def _print_session_summary(self, session: Session) -> None:
+        from rich.table import Table
+        rows = session.species_rows()
+        if not rows:
+            _console.print("[dim]No detections this session.[/dim]")
             return
-        self._csv_writer.writerow(
-            [
-                datetime.datetime.fromtimestamp(det.timestamp).isoformat(),
-                det.classifier,
-                det.label,
-                f"{det.confidence:.4f}",
-                str(det.metadata),
-            ]
-        )
-        self._csv_file.flush()
+        table = Table(title=f"Session {session.session_id} — {session.window_name} summary")
+        table.add_column("Species", style="green")
+        table.add_column("Calls", justify="right")
+        table.add_column("Max conf", justify="right")
+        table.add_column("Avg conf", justify="right")
+        for r in rows:
+            table.add_row(r["species"], str(r["total_calls"]), r["max_confidence"], r["avg_confidence"])
+        _console.print(table)
+
+    @staticmethod
+    def _open_csv(path_str: Optional[str], fields: list[str]):
+        if not path_str:
+            return None, None
+        p = Path(path_str)
+        p.parent.mkdir(parents=True, exist_ok=True)
+        write_header = not p.exists() or p.stat().st_size == 0
+        f = open(p, "a", newline="")
+        writer = csv.DictWriter(f, fieldnames=fields)
+        if write_header:
+            writer.writeheader()
+        return writer, f

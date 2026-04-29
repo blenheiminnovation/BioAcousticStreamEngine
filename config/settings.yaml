@@ -8,17 +8,15 @@ audio:
 classifiers:
   active:
     - bird
-  # Available: bird, bat, insect, soil
 
 bird:
   sample_rate: 48000
-  min_confidence: 0.5
-  latitude: 51.8        # for BirdNET location filtering (Blenheim Palace area)
-  longitude: -1.35
-  week: null            # null = auto-detect from current date
+  min_confidence: 0.35
+  latitude: 51.8403     # Blenheim Palace
+  longitude: -1.3625
 
 bat:
-  sample_rate: 256000   # requires ultrasonic microphone
+  sample_rate: 256000
   min_confidence: 0.6
   freq_min_hz: 15000
   freq_max_hz: 150000
@@ -32,10 +30,42 @@ insect:
 soil:
   sample_rate: 22050
   min_confidence: 0.4
+  energy_threshold: 0.01
   freq_min_hz: 50
   freq_max_hz: 2000
 
+# Listening schedule (times relative to sunrise/sunset at configured lat/lon)
+schedule:
+  timezone: "Europe/London"
+  windows:
+    - name: dawn_chorus       # Robin starts before sunrise; peak bird song
+      anchor: sunrise
+      offset_mins: -30
+      duration_mins: 150
+
+    - name: morning_song      # Secondary activity peak
+      anchor: sunrise
+      offset_mins: 150
+      duration_mins: 60
+
+    - name: dusk              # Evening song / roost calls
+      anchor: sunset
+      offset_mins: -60
+      duration_mins: 90
+
+  # Species that unlock extra listening windows when detected
+  adaptive:
+    nocturnal:                # adds a 60-min window at 23:00 if any of these seen
+      - "Tawny Owl"
+      - "Barn Owl"
+      - "Little Owl"
+      - "European Nightjar"
+    early_morning:            # extends dawn window by 30 min if detected
+      - "Common Nightingale"
+      - "Song Thrush"
+
 output:
   console: true
-  log_file: null        # path to CSV log file, e.g. "detections.csv"
-  min_confidence: 0.4   # global filter applied before any output
+  detections_csv: "output/detections.csv"   # one row per detection
+  sessions_csv: "output/sessions.csv"       # one row per session-species summary
+  min_confidence: 0.35

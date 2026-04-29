@@ -1,10 +1,10 @@
 import queue
 import threading
-from dataclasses import dataclass, field
-from typing import Callable, Optional
+import time
+from dataclasses import dataclass
+from typing import Optional
 
 import numpy as np
-import sounddevice as sd
 
 
 @dataclass
@@ -31,7 +31,7 @@ class AudioCapture:
 
         self._queue: queue.Queue[AudioChunk] = queue.Queue()
         self._buffer = np.zeros(0, dtype=np.float32)
-        self._stream: Optional[sd.InputStream] = None
+        self._stream = None
         self._lock = threading.Lock()
 
     # ------------------------------------------------------------------
@@ -39,6 +39,7 @@ class AudioCapture:
     # ------------------------------------------------------------------
 
     def start(self) -> None:
+        import sounddevice as sd
         self._stream = sd.InputStream(
             samplerate=self.sample_rate,
             channels=self.channels,
@@ -62,17 +63,15 @@ class AudioCapture:
 
     @staticmethod
     def list_devices() -> None:
+        import sounddevice as sd
         print(sd.query_devices())
 
     # ------------------------------------------------------------------
     # Internal
     # ------------------------------------------------------------------
 
-    def _callback(self, indata: np.ndarray, frames: int, time, status) -> None:
-        import time as _time
-
+    def _callback(self, indata: np.ndarray, frames: int, time_info, status) -> None:
         if status:
-            # surfaced as a warning rather than crashing the stream
             print(f"[audio] {status}")
 
         mono = indata[:, 0] if indata.ndim > 1 else indata.ravel()
@@ -86,6 +85,6 @@ class AudioCapture:
                     AudioChunk(
                         data=chunk_data,
                         sample_rate=self.sample_rate,
-                        timestamp=_time.time(),
+                        timestamp=time.time(),
                     )
                 )
