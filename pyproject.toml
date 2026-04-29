@@ -1,0 +1,27 @@
+[build-system]
+requires = ["setuptools>=68", "wheel"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "ecoacoustics"
+version = "0.1.0"
+description = "Real-time acoustic monitoring for birds, bats, insects, and soil"
+requires-python = ">=3.10"
+dependencies = [
+    "sounddevice>=0.4.6",
+    "numpy>=1.24",
+    "scipy>=1.11",
+    "birdnetlib>=0.9",
+    "librosa>=0.10",
+    "PyYAML>=6.0",
+    "rich>=13.0",
+]
+
+[project.optional-dependencies]
+dev = ["pytest>=7.0", "pytest-asyncio>=0.21"]
+
+[project.scripts]
+ecoacoustics = "ecoacoustics.main:main"
+
+[tool.setuptools.packages.find]
+where = ["src"]

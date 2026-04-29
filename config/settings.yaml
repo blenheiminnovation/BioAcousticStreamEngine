@@ -1,0 +1,41 @@
+# Ecoacoustics monitoring configuration
+
+audio:
+  device: null          # null = system default; set to device index or name to override
+  channels: 1
+  chunk_duration: 3.0   # seconds per analysis window
+
+classifiers:
+  active:
+    - bird
+  # Available: bird, bat, insect, soil
+
+bird:
+  sample_rate: 48000
+  min_confidence: 0.5
+  latitude: 51.8        # for BirdNET location filtering (Blenheim Palace area)
+  longitude: -1.35
+  week: null            # null = auto-detect from current date
+
+bat:
+  sample_rate: 256000   # requires ultrasonic microphone
+  min_confidence: 0.6
+  freq_min_hz: 15000
+  freq_max_hz: 150000
+
+insect:
+  sample_rate: 44100
+  min_confidence: 0.5
+  freq_min_hz: 2000
+  freq_max_hz: 20000
+
+soil:
+  sample_rate: 22050
+  min_confidence: 0.4
+  freq_min_hz: 50
+  freq_max_hz: 2000
+
+output:
+  console: true
+  log_file: null        # path to CSV log file, e.g. "detections.csv"
+  min_confidence: 0.4   # global filter applied before any output
