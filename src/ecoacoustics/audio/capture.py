@@ -6,6 +6,10 @@ from typing import Optional
 
 import numpy as np
 
+# How many 3-second chunks to buffer before dropping. At 3s/chunk this is
+# ~60s of headroom for the classifier to catch up before we start losing audio.
+MAX_QUEUE_SIZE = 20
+
 
 @dataclass
 class AudioChunk:
@@ -15,7 +19,7 @@ class AudioChunk:
 
 
 class AudioCapture:
-    """Streams audio from a microphone into a thread-safe queue."""
+    """Streams audio from a microphone into a thread-safe bounded queue."""
 
     def __init__(
         self,
@@ -23,16 +27,22 @@ class AudioCapture:
         chunk_duration: float,
         device: Optional[int | str] = None,
         channels: int = 1,
+        max_queue_size: int = MAX_QUEUE_SIZE,
     ):
         self.sample_rate = sample_rate
         self.chunk_samples = int(sample_rate * chunk_duration)
         self.device = device
         self.channels = channels
 
-        self._queue: queue.Queue[AudioChunk] = queue.Queue()
+        self._queue: queue.Queue[AudioChunk] = queue.Queue(maxsize=max_queue_size)
+        self._queue_capacity = max_queue_size
         self._buffer = np.zeros(0, dtype=np.float32)
         self._stream = None
         self._lock = threading.Lock()
+
+        self._dropped: int = 0          # chunks discarded when queue was full
+        self._last_chunk_time: float = 0.0
+        self._overflow_count: int = 0   # sounddevice input overflow events
 
     # ------------------------------------------------------------------
     # Public API
@@ -51,9 +61,26 @@ class AudioCapture:
 
     def stop(self) -> None:
         if self._stream:
-            self._stream.stop()
-            self._stream.close()
+            try:
+                self._stream.stop()
+                self._stream.close()
+            except Exception:
+                pass
             self._stream = None
+
+    def restart(self) -> None:
+        """Stop and restart the audio stream (e.g. after device error)."""
+        self.stop()
+        # Drain the queue so stale audio doesn't clog the classifier
+        while not self._queue.empty():
+            try:
+                self._queue.get_nowait()
+            except queue.Empty:
+                break
+        with self._lock:
+            self._buffer = np.zeros(0, dtype=np.float32)
+        time.sleep(1.0)
+        self.start()
 
     def get_chunk(self, timeout: float = 5.0) -> Optional[AudioChunk]:
         try:
@@ -67,12 +94,36 @@ class AudioCapture:
         print(sd.query_devices())
 
     # ------------------------------------------------------------------
-    # Internal
+    # Health properties (read by Watchdog)
+    # ------------------------------------------------------------------
+
+    @property
+    def queue_depth(self) -> int:
+        return self._queue.qsize()
+
+    @property
+    def queue_capacity(self) -> int:
+        return self._queue_capacity
+
+    @property
+    def dropped_chunks(self) -> int:
+        return self._dropped
+
+    @property
+    def last_chunk_time(self) -> float:
+        return self._last_chunk_time
+
+    @property
+    def overflow_count(self) -> int:
+        return self._overflow_count
+
+    # ------------------------------------------------------------------
+    # Internal callback (runs in sounddevice thread)
     # ------------------------------------------------------------------
 
     def _callback(self, indata: np.ndarray, frames: int, time_info, status) -> None:
-        if status:
-            print(f"[audio] {status}")
+        if status.input_overflow:
+            self._overflow_count += 1
 
         mono = indata[:, 0] if indata.ndim > 1 else indata.ravel()
 
@@ -81,10 +132,15 @@ class AudioCapture:
             while len(self._buffer) >= self.chunk_samples:
                 chunk_data = self._buffer[: self.chunk_samples].copy()
                 self._buffer = self._buffer[self.chunk_samples :]
-                self._queue.put(
-                    AudioChunk(
-                        data=chunk_data,
-                        sample_rate=self.sample_rate,
-                        timestamp=time.time(),
-                    )
+                chunk = AudioChunk(
+                    data=chunk_data,
+                    sample_rate=self.sample_rate,
+                    timestamp=time.time(),
                 )
+                try:
+                    self._queue.put_nowait(chunk)
+                    self._last_chunk_time = chunk.timestamp
+                except queue.Full:
+                    # Queue is full — discard this chunk rather than blocking
+                    # the audio callback (which would cause a dropout).
+                    self._dropped += 1

@@ -4,6 +4,7 @@ audio:
   device: null          # null = system default; set to device index or name to override
   channels: 1
   chunk_duration: 3.0   # seconds per analysis window
+  max_queue_size: 20    # chunks buffered before oldest are dropped (~60s headroom at 3s/chunk)
 
 classifiers:
   active:

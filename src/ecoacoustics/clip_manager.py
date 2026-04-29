@@ -9,6 +9,7 @@ Save priority:
 """
 
 import json
+import shutil
 import threading
 from datetime import datetime
 from pathlib import Path
@@ -16,6 +17,8 @@ from typing import Optional
 
 import numpy as np
 import soundfile as sf
+
+DISK_MIN_FREE_MB = 200   # refuse to save new clips below this free-space level
 
 from ecoacoustics.classifiers.base import Detection
 
@@ -76,8 +79,30 @@ class ClipManager:
     # Decision logic
     # ------------------------------------------------------------------
 
+    def disk_free_mb(self) -> int:
+        try:
+            return shutil.disk_usage(self._clips_dir).free // (1024 ** 2)
+        except OSError:
+            return 0
+
+    def emergency_cleanup(self, target_free_mb: int = 500) -> int:
+        """
+        Delete lowest-confidence clips across all species until target_free_mb
+        is free, or until no more clips remain. Returns number of files removed.
+        """
+        removed = 0
+        all_clips = sorted(self._clips_dir.rglob("*.wav"), key=_conf_from_path)
+        for clip in all_clips:
+            if self.disk_free_mb() >= target_free_mb:
+                break
+            clip.unlink(missing_ok=True)
+            removed += 1
+        return removed
+
     def _should_save(self, species: str, confidence: float, is_new: bool) -> bool:
         if confidence < self._min_conf:
+            return False
+        if self.disk_free_mb() < DISK_MIN_FREE_MB:
             return False
         if is_new:
             return True

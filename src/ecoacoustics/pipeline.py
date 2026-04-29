@@ -13,8 +13,12 @@ from ecoacoustics.classifiers import REGISTRY, BaseClassifier
 from ecoacoustics.clip_manager import ClipManager
 from ecoacoustics.output.logger import DetectionLogger
 from ecoacoustics.session import Session
+from ecoacoustics.watchdog import Watchdog
 
 _console = Console()
+
+# Consecutive classify() failures before attempting a model reload
+_MAX_ERRORS_BEFORE_RELOAD = 5
 
 
 class Pipeline:
@@ -26,6 +30,7 @@ class Pipeline:
 
         bird_cfg = self._cfg.get("bird", {})
         out_cfg = self._cfg.get("output", {})
+        clips_cfg = self._cfg.get("clips", {})
 
         self._logger = DetectionLogger(
             console=out_cfg.get("console", True),
@@ -35,8 +40,6 @@ class Pipeline:
             latitude=bird_cfg.get("latitude"),
             longitude=bird_cfg.get("longitude"),
         )
-
-        clips_cfg = self._cfg.get("clips", {})
         self._clip_manager = ClipManager(
             clips_dir=clips_cfg.get("dir", "output/clips"),
             species_db_path=clips_cfg.get("species_db", "output/known_species.json"),
@@ -55,6 +58,7 @@ class Pipeline:
                     chunk_duration=self._cfg["audio"]["chunk_duration"],
                     device=self._cfg["audio"].get("device"),
                     channels=self._cfg["audio"].get("channels", 1),
+                    max_queue_size=self._cfg["audio"].get("max_queue_size", 20),
                 )
             self._processors[clf.name] = AudioProcessor(
                 target_sample_rate=clf.sample_rate,
@@ -87,6 +91,14 @@ class Pipeline:
         for capture in self._captures.values():
             capture.start()
 
+        watchdog = Watchdog(
+            captures=self._captures,
+            clip_manager=self._clip_manager,
+            stop_event=self._stop_event,
+            clips_dir=self._cfg.get("clips", {}).get("dir", "output/clips"),
+        )
+        watchdog.start()
+
         session = Session(window_name=window_name)
         dur_str = f" for {duration_seconds/60:.0f} min" if duration_seconds else ""
         _console.print(
@@ -115,20 +127,24 @@ class Pipeline:
         self._logger.close()
 
     # ------------------------------------------------------------------
-    # Internal
+    # Classifier loop with auto-recovery
     # ------------------------------------------------------------------
 
     def _classifier_loop(self, clf: BaseClassifier, session: Session) -> None:
         capture = self._captures[clf.sample_rate]
         processor = self._processors[clf.name]
+        consecutive_errors = 0
 
         while not self._stop_event.is_set():
             chunk = capture.get_chunk(timeout=1.0)
             if chunk is None:
                 continue
+
             try:
                 processed = processor.process(chunk)
                 detections = clf.classify(processed)
+                consecutive_errors = 0  # reset on any successful inference
+
                 if not detections:
                     continue
 
@@ -140,15 +156,40 @@ class Pipeline:
                     )
                     if is_new:
                         _console.print(
-                            f"\n[bold yellow] NEW SPECIES DETECTED: "
-                            f"{det.label} ({det.metadata.get('scientific_name', '')}) "
-                            f"— conf {det.confidence:.0%}[/bold yellow]\n"
+                            f"\n[bold yellow] NEW SPECIES: {det.label} "
+                            f"({det.metadata.get('scientific_name', '')}) "
+                            f"conf {det.confidence:.0%}[/bold yellow]\n"
                         )
                     elif saved_path:
-                        _console.print(f"[dim]  clip saved → {saved_path.name}[/dim]")
+                        _console.print(f"[dim]  clip → {saved_path.name}[/dim]")
 
             except Exception as exc:
-                _console.print(f"[red][{clf.name}] error: {exc}[/red]")
+                consecutive_errors += 1
+                _console.print(
+                    f"[red][{clf.name}] error {consecutive_errors}/{_MAX_ERRORS_BEFORE_RELOAD}: "
+                    f"{exc}[/red]"
+                )
+
+                if consecutive_errors >= _MAX_ERRORS_BEFORE_RELOAD:
+                    _console.print(
+                        f"[yellow][{clf.name}] reloading model after "
+                        f"{consecutive_errors} consecutive errors...[/yellow]"
+                    )
+                    try:
+                        clf.cleanup()
+                        clf.load()
+                        consecutive_errors = 0
+                        _console.print(f"[green][{clf.name}] model reloaded successfully[/green]")
+                    except Exception as reload_exc:
+                        _console.print(
+                            f"[bold red][{clf.name}] reload failed: {reload_exc}. "
+                            f"Classifier stopped.[/bold red]"
+                        )
+                        return  # exit this thread; others continue
+
+    # ------------------------------------------------------------------
+    # Internal
+    # ------------------------------------------------------------------
 
     def _build_classifiers(self) -> list[BaseClassifier]:
         active = self._cfg["classifiers"]["active"]
