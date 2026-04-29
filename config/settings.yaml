@@ -17,10 +17,12 @@ bird:
   longitude: -1.3625
 
 bat:
-  sample_rate: 256000
-  min_confidence: 0.6
-  freq_min_hz: 15000
-  freq_max_hz: 150000
+  # capture_rate must match your ultrasonic microphone's maximum sample rate
+  # Common values: 192000 (Dodotronic Ultramic 384K), 256000, 384000
+  capture_rate: 256000
+  min_det_confidence: 0.5    # minimum call-presence probability
+  min_class_confidence: 0.4  # minimum species-identity probability
+  silence_threshold: 0.0001  # RMS below this skips inference entirely
 
 insect:
   sample_rate: 44100
@@ -55,6 +57,25 @@ schedule:
       duration_mins: 90
 
   # Species that unlock extra listening windows when detected
+  # Uncomment the bat_windows block below when running with an ultrasonic mic.
+  # These replace the bird windows — run bird and bat monitoring separately
+  # unless you have two microphones at different sample rates.
+  #
+  # bat_windows:
+  #   - name: bat_dusk_emergence
+  #     anchor: sunset
+  #     offset_mins: -15
+  #     duration_mins: 120       # peak emergence 15 min before to 90 min after sunset
+  #   - name: bat_night_roost
+  #     anchor: fixed
+  #     offset_mins: 0
+  #     duration_mins: 60
+  #     fixed_time: "01:00"      # second activity peak for some species
+  #   - name: bat_pre_dawn
+  #     anchor: sunrise
+  #     offset_mins: -60
+  #     duration_mins: 60        # return-to-roost flight
+
   adaptive:
     nocturnal:                # adds a 60-min window at 23:00 if any of these seen
       - "Tawny Owl"
