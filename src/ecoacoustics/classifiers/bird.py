@@ -1,6 +1,7 @@
 import datetime
 import os
 import tempfile
+import warnings
 from typing import Any
 
 import soundfile as sf
@@ -29,9 +30,19 @@ class BirdClassifier(BaseClassifier):
         return 48000
 
     def load(self) -> None:
-        from birdnetlib.analyzer import Analyzer
-        from birdnetlib import Recording
-        self._analyzer = Analyzer()
+        import contextlib
+        from rich.console import Console
+
+        os.environ.setdefault("TF_CPP_MIN_LOG_LEVEL", "3")
+        with warnings.catch_warnings():
+            warnings.simplefilter("ignore")
+            from birdnetlib.analyzer import Analyzer
+            from birdnetlib import Recording
+
+        Console().print("[dim]Loading BirdNET model...[/dim]", end="")
+        with open(os.devnull, "w") as devnull, contextlib.redirect_stdout(devnull):
+            self._analyzer = Analyzer()
+        Console().print("[dim] done[/dim]")
         self._Recording = Recording
 
     def classify(self, chunk: AudioChunk) -> list[Detection]:

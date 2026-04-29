@@ -1,7 +1,14 @@
 import argparse
+import os
 import sys
 import time
+import warnings
 from datetime import datetime
+
+# Suppress noisy TF/pydub startup warnings before any imports trigger them
+os.environ.setdefault("TF_CPP_MIN_LOG_LEVEL", "3")
+warnings.filterwarnings("ignore", category=UserWarning, module="tensorflow")
+warnings.filterwarnings("ignore", category=RuntimeWarning, module="pydub")
 
 import yaml
 from rich.console import Console
