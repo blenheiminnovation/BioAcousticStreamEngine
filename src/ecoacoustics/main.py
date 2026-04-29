@@ -1,3 +1,31 @@
+"""
+Command-line entry point for the Smart Ecoacoustics monitoring system.
+
+Provides four sub-commands:
+
+  wake        Start listening immediately, either indefinitely or for a
+              specified number of minutes.
+
+  schedule    Run the automated dawn/dusk schedule defined in settings.yaml,
+              sleeping between windows and adapting future windows based on
+              which species have been detected.
+
+  status      Display today's calculated listening windows and a summary of
+              all species detected so far today.
+
+  list-devices  Print available audio input devices and their indices so the
+                correct device can be set in config/settings.yaml.
+
+Usage examples::
+
+    .venv/bin/python -m ecoacoustics.main wake
+    .venv/bin/python -m ecoacoustics.main wake --duration 30
+    .venv/bin/python -m ecoacoustics.main schedule
+    .venv/bin/python -m ecoacoustics.main status
+
+Author: David Green, Blenheim Palace
+"""
+
 import argparse
 import os
 import sys
@@ -5,19 +33,20 @@ import time
 import warnings
 from datetime import datetime
 
+import yaml
+from rich.console import Console
+from rich.table import Table
+
 # Suppress noisy TF/pydub startup warnings before any imports trigger them
 os.environ.setdefault("TF_CPP_MIN_LOG_LEVEL", "3")
 warnings.filterwarnings("ignore", category=UserWarning, module="tensorflow")
 warnings.filterwarnings("ignore", category=RuntimeWarning, module="pydub")
 
-import yaml
-from rich.console import Console
-from rich.table import Table
-
 _console = Console()
 
 
 def cmd_wake(args) -> None:
+    """Start the pipeline immediately and listen until stopped or time elapses."""
     from ecoacoustics.pipeline import Pipeline
 
     pipeline = Pipeline(config_path=args.config)
@@ -29,7 +58,13 @@ def cmd_wake(args) -> None:
 
 
 def cmd_schedule(args) -> None:
-    """Run automated schedule: sleep → wake → listen → sleep → ..."""
+    """Run the automated schedule: sleep → wake → listen → sleep → repeat.
+
+    Calculates dawn/dusk windows for the current day, waits until the next
+    window opens, listens for the window duration, writes the session summary,
+    then checks whether the detected species warrant adding any adaptive windows
+    before sleeping until the next scheduled window.
+    """
     from ecoacoustics.pipeline import Pipeline
     from ecoacoustics.scheduler import Scheduler
 
@@ -47,13 +82,16 @@ def cmd_schedule(args) -> None:
 
     try:
         while True:
-            # If we're currently inside a window, listen for the remainder
+            # If already inside a window, listen for the remainder of it
             current = scheduler.current_window()
             if current:
                 start, end, name = current
                 remaining = (end - datetime.now(start.tzinfo)).total_seconds()
                 if remaining > 5:
-                    _console.print(f"[green]In window:[/green] [cyan]{name}[/cyan] — {remaining/60:.0f} min remaining")
+                    _console.print(
+                        f"[green]In window:[/green] [cyan]{name}[/cyan] "
+                        f"— {remaining/60:.0f} min remaining"
+                    )
                     session = pipeline.run(window_name=name, duration_seconds=remaining)
                     all_species |= session.species_detected()
                     added = scheduler.adapt(all_species, adaptive_cfg)
@@ -61,7 +99,7 @@ def cmd_schedule(args) -> None:
                         _console.print(f"[yellow]Schedule adapted — new windows: {added}[/yellow]")
                     continue
 
-            # Sleep until next window
+            # Sleep until the next window opens
             nw = scheduler.next_window()
             if nw is None:
                 _console.print("[dim]No upcoming windows found. Exiting.[/dim]")
@@ -83,6 +121,7 @@ def cmd_schedule(args) -> None:
 
 
 def cmd_status(args) -> None:
+    """Print today's schedule and a summary of today's detections from CSV."""
     import csv
     from pathlib import Path
     from ecoacoustics.scheduler import Scheduler
@@ -94,20 +133,23 @@ def cmd_status(args) -> None:
     now_str = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
     _console.print(f"\n[bold]Ecoacoustics status[/bold]  [dim]{now_str}[/dim]")
 
-    # Schedule
     _console.print("\n[bold]Today's listening windows:[/bold]")
     current = scheduler.current_window()
     for start, end, name in scheduler.window_times():
         active = " ← [green]ACTIVE NOW[/green]" if (current and current[2] == name) else ""
-        _console.print(f"  [cyan]{name:<20}[/cyan] {start.strftime('%H:%M')} → {end.strftime('%H:%M')}{active}")
+        _console.print(
+            f"  [cyan]{name:<20}[/cyan] {start.strftime('%H:%M')} → {end.strftime('%H:%M')}{active}"
+        )
 
     nw = scheduler.next_window()
     if nw:
         wait = scheduler.seconds_until_next()
-        _console.print(f"\nNext: [cyan]{nw[2]}[/cyan] at {nw[0].strftime('%H:%M')} "
-                       f"(in {wait/60:.0f} min)")
+        _console.print(
+            f"\nNext: [cyan]{nw[2]}[/cyan] at {nw[0].strftime('%H:%M')} "
+            f"(in {wait/60:.0f} min)"
+        )
 
-    # Today's detections from CSV
+    # Read today's entries from sessions.csv and display as a table
     sessions_path = Path(cfg["output"].get("sessions_csv", "output/sessions.csv"))
     if sessions_path.exists():
         today = datetime.now().strftime("%Y-%m-%d")
@@ -130,11 +172,11 @@ def cmd_status(args) -> None:
         else:
             _console.print(f"\n[dim]No detections logged today ({today}).[/dim]")
     else:
-        _console.print("\n[dim]No session log found yet.[/dim]")
+        _console.print("\n[dim]No session log found yet — run 'wake' or 'schedule' first.[/dim]")
 
 
 def _sleep_interruptible(seconds: float, poll: float = 5.0) -> None:
-    """Sleep in short bursts so KeyboardInterrupt is responsive."""
+    """Sleep in short bursts so KeyboardInterrupt is handled responsively."""
     remaining = seconds
     while remaining > 0:
         time.sleep(min(poll, remaining))
@@ -142,9 +184,19 @@ def _sleep_interruptible(seconds: float, poll: float = 5.0) -> None:
 
 
 def main() -> None:
+    """Parse command-line arguments and dispatch to the appropriate command."""
     parser = argparse.ArgumentParser(
         prog="ecoacoustics",
-        description="Real-time ecoacoustic monitoring",
+        description="Smart Ecoacoustics — real-time biodiversity monitoring",
+        formatter_class=argparse.RawDescriptionHelpFormatter,
+        epilog=(
+            "examples:\n"
+            "  ecoacoustics wake                   # listen until Ctrl+C\n"
+            "  ecoacoustics wake --duration 30     # listen for 30 minutes\n"
+            "  ecoacoustics schedule               # run dawn/dusk schedule\n"
+            "  ecoacoustics status                 # show schedule and today's detections\n"
+            "  ecoacoustics list-devices           # list microphone devices"
+        ),
     )
     sub = parser.add_subparsers(dest="command", metavar="COMMAND")
 
@@ -152,17 +204,17 @@ def main() -> None:
     p_wake = sub.add_parser("wake", help="Start listening now")
     p_wake.add_argument(
         "--duration", type=int, metavar="MINUTES",
-        help="Listen for N minutes then stop (default: until Ctrl+C)",
+        help="Stop after N minutes (default: run until Ctrl+C)",
     )
-    p_wake.add_argument("--config", default="config/settings.yaml")
+    p_wake.add_argument("--config", default="config/settings.yaml", metavar="PATH")
 
     # --- schedule ---
-    p_sched = sub.add_parser("schedule", help="Auto wake/sleep based on dawn & dusk windows")
-    p_sched.add_argument("--config", default="config/settings.yaml")
+    p_sched = sub.add_parser("schedule", help="Auto wake/sleep on the configured dawn/dusk schedule")
+    p_sched.add_argument("--config", default="config/settings.yaml", metavar="PATH")
 
     # --- status ---
     p_status = sub.add_parser("status", help="Show today's schedule and detection summary")
-    p_status.add_argument("--config", default="config/settings.yaml")
+    p_status.add_argument("--config", default="config/settings.yaml", metavar="PATH")
 
     # --- list-devices ---
     sub.add_parser("list-devices", help="List available audio input devices")

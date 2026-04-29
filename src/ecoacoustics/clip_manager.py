@@ -1,11 +1,23 @@
 """
-Manages on-disk audio clip storage with per-species limits and priority rules.
+Audio clip library with intelligent per-species retention and disk management.
 
-Save priority:
-  1. New species (never seen before)  — always save, flag to console
-  2. Rare locally (< 20 total detections) — save if conf >= min_confidence
-  3. Common species — save if conf >= high_conf_threshold; rotate out weakest
-     clips when the 100-clip limit is reached
+Every confirmed detection can optionally be saved as a WAV file under
+output/clips/<Species>/.  The ClipManager decides whether to save each clip
+based on the species' rarity at this site, the detection confidence, and the
+available disk space.  It enforces a configurable per-species clip limit by
+rotating out the lowest-confidence clip whenever a better one arrives.
+
+Save priority rules:
+  1. New species (never detected here before) — always saved, console alert shown.
+  2. Locally rare species (fewer than 20 total detections) — saved at min_confidence.
+  3. Common species — saved only if confidence ≥ 0.70; limit enforced by rotating
+     out the weakest clip when the 100-clip ceiling is reached.
+  4. Any species — clip refused if free disk space is below DISK_MIN_FREE_MB.
+
+The species registry (output/known_species.json) persists across restarts so
+that "new species" detection works correctly over multiple sessions.
+
+Author: David Green, Blenheim Palace
 """
 
 import json
@@ -18,15 +30,22 @@ from typing import Optional
 import numpy as np
 import soundfile as sf
 
-DISK_MIN_FREE_MB = 200   # refuse to save new clips below this free-space level
-
 from ecoacoustics.classifiers.base import Detection
 
-_RARE_THRESHOLD = 20      # fewer total detections → treat as locally rare
-_HIGH_CONF = 0.70         # common-species clips must beat this to be saved
+DISK_MIN_FREE_MB = 200   # refuse to save new clips below this free-space level
+
+_RARE_THRESHOLD = 20     # total detections below this → treat species as locally rare
+_HIGH_CONF = 0.70        # common-species clips must beat this confidence to be saved
 
 
 class ClipManager:
+    """Thread-safe manager for the on-disk audio clip library.
+
+    Maintains a JSON species registry and enforces per-species clip limits
+    by removing the lowest-confidence file whenever a newer, better clip
+    would push the count over the maximum.
+    """
+
     def __init__(
         self,
         clips_dir: str,
@@ -34,6 +53,13 @@ class ClipManager:
         max_clips_per_species: int = 100,
         min_confidence: float = 0.35,
     ):
+        """
+        Args:
+            clips_dir: Root directory for saved clips (one sub-folder per species).
+            species_db_path: Path to the JSON species registry file.
+            max_clips_per_species: Hard cap on WAV files kept per species.
+            min_confidence: Global minimum confidence — clips below this are never saved.
+        """
         self._clips_dir = Path(clips_dir)
         self._clips_dir.mkdir(parents=True, exist_ok=True)
         self._db_path = Path(species_db_path)
@@ -44,16 +70,26 @@ class ClipManager:
         self._db: dict = self._load_db()
 
     # ------------------------------------------------------------------
-    # Public
+    # Public API
     # ------------------------------------------------------------------
 
     def process(
         self, detection: Detection, audio: np.ndarray, sample_rate: int
     ) -> tuple[Optional[Path], bool]:
-        """
-        Record the detection and optionally save the audio clip.
-        Returns (saved_path_or_None, is_new_species).
-        Thread-safe.
+        """Record the detection and optionally save the audio clip.
+
+        This is the primary entry point called by the pipeline after each
+        detection.  It is fully thread-safe and handles the species registry
+        update, save decision, file write, and limit enforcement atomically.
+
+        Args:
+            detection: The Detection returned by a classifier.
+            audio: The float32 audio array for the chunk that produced this detection.
+            sample_rate: Sample rate of audio (Hz).
+
+        Returns:
+            (saved_path, is_new_species) where saved_path is the Path of the
+            written WAV file, or None if the clip was not saved.
         """
         with self._lock:
             species = detection.label
@@ -68,27 +104,34 @@ class ClipManager:
             return path, is_new
 
     def known_species_count(self) -> int:
+        """Return the total number of distinct species ever detected at this site."""
         with self._lock:
             return len(self._db)
 
     def total_detections(self, species: str) -> int:
+        """Return the all-time detection count for a species across all sessions."""
         with self._lock:
             return self._db.get(species, {}).get("total_detections", 0)
 
-    # ------------------------------------------------------------------
-    # Decision logic
-    # ------------------------------------------------------------------
-
     def disk_free_mb(self) -> int:
+        """Return free disk space (MB) on the volume holding the clips directory."""
         try:
             return shutil.disk_usage(self._clips_dir).free // (1024 ** 2)
         except OSError:
             return 0
 
     def emergency_cleanup(self, target_free_mb: int = 500) -> int:
-        """
-        Delete lowest-confidence clips across all species until target_free_mb
-        is free, or until no more clips remain. Returns number of files removed.
+        """Delete lowest-confidence clips across all species until disk is freed.
+
+        Called by the Watchdog when free disk space falls to a critical level.
+        Clips are removed in ascending confidence order so the most valuable
+        recordings are always retained as long as possible.
+
+        Args:
+            target_free_mb: Stop removing files once this many MB are free.
+
+        Returns:
+            Number of WAV files removed.
         """
         removed = 0
         all_clips = sorted(self._clips_dir.rglob("*.wav"), key=_conf_from_path)
@@ -99,7 +142,12 @@ class ClipManager:
             removed += 1
         return removed
 
+    # ------------------------------------------------------------------
+    # Save decision logic
+    # ------------------------------------------------------------------
+
     def _should_save(self, species: str, confidence: float, is_new: bool) -> bool:
+        """Return True if this clip should be written to disk."""
         if confidence < self._min_conf:
             return False
         if self.disk_free_mb() < DISK_MIN_FREE_MB:
@@ -111,23 +159,28 @@ class ClipManager:
         n_clips = self._clip_count(species)
 
         if n_clips >= self._max_clips:
-            # only save if it beats the weakest clip already stored
+            # Only save if this clip beats the worst one already stored
             worst = self._worst_confidence(species)
             return worst is not None and confidence > worst
 
         if total < _RARE_THRESHOLD:
-            return True  # locally rare — always keep
+            return True  # locally rare — preserve every confident detection
 
-        return confidence >= _HIGH_CONF  # common — quality bar
+        return confidence >= _HIGH_CONF  # common species — quality bar applies
 
     # ------------------------------------------------------------------
-    # Storage
+    # File I/O
     # ------------------------------------------------------------------
 
     def _write_clip(
         self, audio: np.ndarray, sample_rate: int, species: str,
         confidence: float, timestamp: float,
     ) -> Path:
+        """Write a WAV clip to disk and return its path.
+
+        Filename encodes timestamp and confidence so clips can be sorted
+        or filtered by confidence without reading the audio data.
+        """
         species_dir = self._clips_dir / _safe_dirname(species)
         species_dir.mkdir(exist_ok=True)
         ts = datetime.fromtimestamp(timestamp).strftime("%Y%m%d_%H%M%S")
@@ -137,6 +190,7 @@ class ClipManager:
         return path
 
     def _enforce_limit(self, species: str) -> None:
+        """Remove the lowest-confidence clip(s) until the species is within the cap."""
         species_dir = self._clips_dir / _safe_dirname(species)
         if not species_dir.exists():
             return
@@ -147,10 +201,12 @@ class ClipManager:
             clips.remove(worst)
 
     def _clip_count(self, species: str) -> int:
+        """Return the number of WAV files currently stored for a species."""
         d = self._clips_dir / _safe_dirname(species)
         return len(list(d.glob("*.wav"))) if d.exists() else 0
 
     def _worst_confidence(self, species: str) -> Optional[float]:
+        """Return the lowest confidence score among stored clips for a species."""
         d = self._clips_dir / _safe_dirname(species)
         if not d.exists():
             return None
@@ -158,10 +214,11 @@ class ClipManager:
         return _conf_from_path(min(clips, key=_conf_from_path)) if clips else None
 
     # ------------------------------------------------------------------
-    # Species database
+    # Species registry
     # ------------------------------------------------------------------
 
     def _record_detection(self, species: str) -> None:
+        """Increment the detection counter and persist the registry to disk."""
         today = datetime.now().strftime("%Y-%m-%d")
         if species not in self._db:
             self._db[species] = {"first_seen": today, "total_detections": 0}
@@ -170,26 +227,33 @@ class ClipManager:
         self._flush_db()
 
     def _load_db(self) -> dict:
+        """Load the species registry from JSON, returning an empty dict if absent."""
         if self._db_path.exists():
             with open(self._db_path) as f:
                 return json.load(f)
         return {}
 
     def _flush_db(self) -> None:
+        """Write the in-memory registry to disk (called after every detection)."""
         with open(self._db_path, "w") as f:
             json.dump(self._db, f, indent=2, sort_keys=True)
 
 
 # ------------------------------------------------------------------
-# Helpers
+# Module-level helpers
 # ------------------------------------------------------------------
 
 def _safe_dirname(species: str) -> str:
+    """Convert a species common name to a safe directory name."""
     return species.replace(" ", "_").replace("/", "-")
 
 
 def _conf_from_path(path: Path) -> float:
-    """Extract confidence from e.g. 20260429_091432_conf87.wav → 0.87"""
+    """Extract the confidence value encoded in a clip filename.
+
+    Example: 20260429_091432_conf87.wav → 0.87
+    Returns 0.0 if the filename does not match the expected format.
+    """
     try:
         return int(path.stem.split("_conf")[-1]) / 100.0
     except (ValueError, IndexError):

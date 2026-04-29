@@ -1,3 +1,21 @@
+"""
+Central processing pipeline — connects audio capture to classifiers and logging.
+
+The Pipeline is the top-level coordinator for a single listening session.
+It owns:
+  - One AudioCapture stream per unique classifier sample rate
+  - One AudioProcessor per classifier
+  - The DetectionLogger and ClipManager (shared across all classifiers)
+  - A Watchdog daemon thread for health monitoring and recovery
+
+Each active classifier runs in its own thread.  If a classifier raises
+exceptions repeatedly, the pipeline reloads the model in-place.  If the
+reload fails, that classifier thread exits cleanly while the others continue,
+ensuring continuous recording is not interrupted by a single component failure.
+
+Author: David Green, Blenheim Palace
+"""
+
 import concurrent.futures
 import signal
 import threading
@@ -17,12 +35,26 @@ from ecoacoustics.watchdog import Watchdog
 
 _console = Console()
 
-# Consecutive classify() failures before attempting a model reload
+# Consecutive classify() failures before attempting an in-place model reload
 _MAX_ERRORS_BEFORE_RELOAD = 5
 
 
 class Pipeline:
+    """Orchestrates the full detection loop for one listening session.
+
+    Typical usage::
+
+        pipeline = Pipeline("config/settings.yaml")
+        session = pipeline.run(window_name="dawn_chorus", duration_seconds=5400)
+        pipeline.close()
+    """
+
     def __init__(self, config_path: str = "config/settings.yaml"):
+        """Load configuration and prepare all subsystems.
+
+        Args:
+            config_path: Path to the YAML settings file.
+        """
         with open(config_path) as f:
             self._cfg = yaml.safe_load(f)
 
@@ -72,9 +104,24 @@ class Pipeline:
 
     @property
     def config(self) -> dict:
+        """The loaded settings dictionary."""
         return self._cfg
 
     def run(self, window_name: str = "manual", duration_seconds: Optional[float] = None) -> Session:
+        """Start listening and classifying until stopped or duration elapses.
+
+        Loads all classifier models, starts audio capture streams, launches
+        classifier threads and the Watchdog, then blocks until the session ends.
+        Writes the session summary and cleans up on return.
+
+        Args:
+            window_name: Label for this listening session (e.g. 'dawn_chorus').
+            duration_seconds: Stop automatically after this many seconds; None
+                means run until Ctrl+C or SIGTERM.
+
+        Returns:
+            The completed Session object containing all detection statistics.
+        """
         self._stop_event.clear()
 
         if duration_seconds:
@@ -124,6 +171,7 @@ class Pipeline:
         return session
 
     def close(self) -> None:
+        """Flush and close the CSV log files."""
         self._logger.close()
 
     # ------------------------------------------------------------------
@@ -131,6 +179,16 @@ class Pipeline:
     # ------------------------------------------------------------------
 
     def _classifier_loop(self, clf: BaseClassifier, session: Session) -> None:
+        """Continuously classify audio chunks from the capture queue.
+
+        Resets the consecutive-error counter on every successful inference.
+        After _MAX_ERRORS_BEFORE_RELOAD consecutive failures, attempts to
+        reload the model; if the reload itself fails, exits the thread cleanly.
+
+        Args:
+            clf: The classifier to run.
+            session: The active session for recording detections.
+        """
         capture = self._captures[clf.sample_rate]
         processor = self._processors[clf.name]
         consecutive_errors = 0
@@ -185,13 +243,14 @@ class Pipeline:
                             f"[bold red][{clf.name}] reload failed: {reload_exc}. "
                             f"Classifier stopped.[/bold red]"
                         )
-                        return  # exit this thread; others continue
+                        return  # exit thread; other classifiers continue unaffected
 
     # ------------------------------------------------------------------
-    # Internal
+    # Internal helpers
     # ------------------------------------------------------------------
 
     def _build_classifiers(self) -> list[BaseClassifier]:
+        """Instantiate classifiers listed in settings.yaml classifiers.active."""
         active = self._cfg["classifiers"]["active"]
         result = []
         for name in active:
@@ -201,5 +260,6 @@ class Pipeline:
         return result
 
     def _handle_sigint(self, *_) -> None:
+        """Set the stop event on SIGINT or SIGTERM to allow clean shutdown."""
         _console.print("\n[yellow]Stopping...[/yellow]")
         self._stop_event.set()
