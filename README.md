@@ -197,11 +197,42 @@ The pipeline will automatically set up the correct audio stream and frequency fi
 | `sounddevice` | Microphone capture |
 | `birdnetlib` | BirdNET-Analyzer Python wrapper |
 | `tensorflow-cpu` | TFLite runtime for BirdNET model |
+| `batdetect2` | BatDetect2 PyTorch model |
 | `librosa` | Audio resampling |
 | `scipy` | Bandpass filtering |
 | `astral` | Sunrise/sunset calculation |
 | `rich` | Terminal display |
 | `PyYAML` | Configuration loading |
+
+---
+
+## Credits
+
+### BirdNET-Analyzer
+
+Bird species identification is powered by **BirdNET-Analyzer**, developed by the [K. Lisa Yang Center for Conservation Bioacoustics](https://www.birds.cornell.edu/ccb/) at the Cornell Lab of Ornithology and the [Chair of Media Informatics](https://www.tu-chemnitz.de/informatik/MedienInformatik/index.php) at Chemnitz University of Technology.
+
+> Kahl, S., Wood, C. M., Eibl, M., & Klinck, H. (2021).  
+> **BirdNET: A deep learning solution for avian diversity monitoring.**  
+> *Ecological Informatics*, 61, 101236.  
+> https://doi.org/10.1016/j.ecoinf.2021.101236
+
+- GitHub: [github.com/kahst/BirdNET-Analyzer](https://github.com/kahst/BirdNET-Analyzer)
+- Python wrapper: [github.com/joeweiss/birdnetlib](https://github.com/joeweiss/birdnetlib)
+- Covers 6,000+ bird species worldwide; location and date filtering applied for Blenheim Palace (51.84°N, 1.36°W)
+
+### BatDetect2
+
+Bat species identification is powered by **BatDetect2**, developed by [Oisin Mac Aodha](https://homepages.inf.ed.ac.uk/omacaodha/) at the University of Edinburgh and collaborators at Caltech and University College London.
+
+> Mac Aodha, O., Martinez Balvanera, S., Damstra, E., Cooke, C., Eichinski, P., Browning, E., Barataudm M., Boughey, K., Coles, R., Giacomini, G., & Jones, K. E. (2022).  
+> **Towards a General Approach for Bat Echolocation Detection and Classification.**  
+> *bioRxiv* 2022.12.14.520490.  
+> https://doi.org/10.1101/2022.12.14.520490
+
+- GitHub: [github.com/macaodha/batdetect2](https://github.com/macaodha/batdetect2)
+- Covers 17 UK and European bat species; trained on British bat call datasets
+- Requires an ultrasonic microphone (≥192 kHz) — see bat classifier documentation
 
 ---
 
