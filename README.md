@@ -236,4 +236,10 @@ Bat species identification is powered by **BatDetect2**, developed by [Oisin Mac
 
 ---
 
+### Inspiration
+
+This project was inspired by the work and vision of **Dr. Curt Lamberth**, whose research into acoustic biodiversity monitoring provided the founding ideas behind this system.
+
+---
+
 *Blenheim Palace Innovation — Ecoacoustics Project*
