@@ -1,6 +1,6 @@
-# Smart Ecoacoustics
+# Bioacoustic Stream Engine
 
-Real-time acoustic biodiversity monitoring for Blenheim Palace estate. Streams live audio from a microphone, identifies species using AI models, and logs detections with confidence scores, timestamps, and call counts. Designed to scale across birds, bats, insects, and soil acoustics.
+A real-time bioacoustic monitoring platform for Blenheim Palace estate. Continuously streams live audio from field microphones, identifies species using AI classifiers, and logs every detection with confidence scores, timestamps, and call counts. Built to scale across birds, bats, insects, and soil acoustics.
 
 ---
 
@@ -242,4 +242,4 @@ This project was inspired by the work and vision of **Dr. Curt Lamberth**, whose
 
 ---
 
-*Blenheim Palace Innovation — Ecoacoustics Project*
+*Blenheim Palace Innovation — Bioacoustic Stream Engine*
