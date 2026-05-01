@@ -18,12 +18,15 @@ Author: David Green, Blenheim Palace
 import csv
 import datetime
 from pathlib import Path
-from typing import Optional
+from typing import TYPE_CHECKING, Optional
 
 from rich.console import Console
 
 from ecoacoustics.classifiers.base import Detection
 from ecoacoustics.session import Session
+
+if TYPE_CHECKING:
+    from ecoacoustics.output.mqtt_publisher import MqttPublisher
 
 _console = Console()
 
@@ -63,6 +66,7 @@ class DetectionLogger:
         min_confidence: float = 0.0,
         latitude: Optional[float] = None,
         longitude: Optional[float] = None,
+        mqtt_publisher: Optional["MqttPublisher"] = None,
     ):
         """
         Args:
@@ -72,11 +76,13 @@ class DetectionLogger:
             min_confidence: Detections below this score are not logged anywhere.
             latitude: Recording latitude written to every detection row.
             longitude: Recording longitude written to every detection row.
+            mqtt_publisher: Optional publisher; if set, each detection is broadcast via MQTT.
         """
         self._console = console
         self._min_confidence = min_confidence
         self._lat = latitude
         self._lon = longitude
+        self._mqtt = mqtt_publisher
 
         self._det_writer, self._det_file = self._open_csv(detections_csv, _DETECTION_FIELDS)
         self._sess_writer, self._sess_file = self._open_csv(sessions_csv, _SESSION_FIELDS)
@@ -101,6 +107,8 @@ class DetectionLogger:
             call_n = session.record(det)
             self._write_detection_row(det, session, call_n)
             self._write_console(det, call_n)
+            if self._mqtt:
+                self._mqtt.publish(det, session, call_n)
 
     def write_session_summary(self, session: Session) -> None:
         """Append per-species summary rows to sessions.csv and print the table.
@@ -116,10 +124,12 @@ class DetectionLogger:
             self._print_session_summary(session)
 
     def close(self) -> None:
-        """Flush and close both CSV files."""
+        """Flush and close both CSV files and disconnect MQTT if active."""
         for f in (self._det_file, self._sess_file):
             if f:
                 f.close()
+        if self._mqtt:
+            self._mqtt.close()
 
     # ------------------------------------------------------------------
     # Private helpers

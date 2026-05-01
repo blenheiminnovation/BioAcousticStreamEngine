@@ -96,3 +96,21 @@ output:
   detections_csv: "output/detections.csv"   # one row per detection
   sessions_csv: "output/sessions.csv"       # one row per session-species summary
   min_confidence: 0.35
+
+mqtt:
+  enabled: true
+  topic_prefix: "bioacoustics"
+
+  # --- Mode A: bridge ---
+  # Run a local Mosquitto broker and configure it to bridge to a cloud broker
+  # (e.g. EMQX Cloud). The Python code connects to localhost with no credentials;
+  # Mosquitto handles authentication to the remote broker transparently.
+  # host: "localhost"
+  # port: 1883
+
+  # --- Mode B: direct (active) ---
+  # Connect the Python code straight to a remote broker (fixed IP or cloud).
+  # Set host/port to the remote broker and add credentials to config/secrets.yaml.
+  host: "u1d78101.ala.eu-central-1.emqxsl.com"
+  port: 8883
+  tls: true

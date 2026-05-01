@@ -20,6 +20,7 @@ import concurrent.futures
 import signal
 import threading
 import time
+from pathlib import Path
 from typing import Optional
 
 import yaml
@@ -30,6 +31,7 @@ from ecoacoustics.audio.processor import AudioProcessor
 from ecoacoustics.classifiers import REGISTRY, BaseClassifier
 from ecoacoustics.clip_manager import ClipManager
 from ecoacoustics.output.logger import DetectionLogger
+from ecoacoustics.output.mqtt_publisher import MqttPublisher
 from ecoacoustics.session import Session
 from ecoacoustics.watchdog import Watchdog
 
@@ -58,11 +60,35 @@ class Pipeline:
         with open(config_path) as f:
             self._cfg = yaml.safe_load(f)
 
+        secrets_path = Path(config_path).parent / "secrets.yaml"
+        if secrets_path.exists():
+            with open(secrets_path) as f:
+                secrets = yaml.safe_load(f) or {}
+            for key, val in secrets.items():
+                if isinstance(val, dict) and key in self._cfg:
+                    self._cfg[key].update(val)
+                else:
+                    self._cfg[key] = val
+
         self._classifiers: list[BaseClassifier] = self._build_classifiers()
 
         bird_cfg = self._cfg.get("bird", {})
         out_cfg = self._cfg.get("output", {})
         clips_cfg = self._cfg.get("clips", {})
+        mqtt_cfg = self._cfg.get("mqtt", {})
+
+        mqtt_publisher = None
+        if mqtt_cfg.get("enabled", False):
+            mqtt_publisher = MqttPublisher(
+                host=mqtt_cfg.get("host", "localhost"),
+                port=mqtt_cfg.get("port", 1883),
+                topic_prefix=mqtt_cfg.get("topic_prefix", "bioacoustics"),
+                tls=mqtt_cfg.get("tls", False),
+                username=mqtt_cfg.get("username"),
+                password=mqtt_cfg.get("password"),
+                latitude=bird_cfg.get("latitude"),
+                longitude=bird_cfg.get("longitude"),
+            )
 
         self._logger = DetectionLogger(
             console=out_cfg.get("console", True),
@@ -71,6 +97,7 @@ class Pipeline:
             min_confidence=out_cfg.get("min_confidence", 0.0),
             latitude=bird_cfg.get("latitude"),
             longitude=bird_cfg.get("longitude"),
+            mqtt_publisher=mqtt_publisher,
         )
         self._clip_manager = ClipManager(
             clips_dir=clips_cfg.get("dir", "output/clips"),

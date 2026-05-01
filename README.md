@@ -12,6 +12,7 @@ A real-time bioacoustic monitoring platform for Blenheim Palace estate. Continuo
 - **Adaptive scheduling** — if nocturnal species (owls, nightjars) are detected, a night window is automatically added
 - **Detailed logging** — every detection logged with date, time, species, scientific name, confidence, and call number within the session
 - **Session summaries** — per-window species totals with max and average confidence
+- **Live MQTT streaming** — every detection published as JSON in real time; integrate with dashboards, alerting, or any MQTT-compatible tool
 - **Extensible architecture** — bat, insect, and soil classifiers are structured and ready for model plug-ins
 
 ---
@@ -97,6 +98,134 @@ Results are written to the `output/` directory (created automatically).
 
 ---
 
+## MQTT
+
+Every detection is published to a local [Mosquitto](https://mosquitto.org/) broker in real time, enabling live integration with dashboards, alerting pipelines, Node-RED, Home Assistant, or any MQTT-compatible consumer.
+
+### Setup
+
+```bash
+sudo apt-get install -y mosquitto mosquitto-clients
+sudo systemctl enable --now mosquitto
+```
+
+### Topics
+
+| Topic | Content |
+|---|---|
+| `bioacoustics/detections` | Every detection, all classifiers |
+| `bioacoustics/detections/bird` | Bird detections only |
+| `bioacoustics/detections/bat` | Bat detections only |
+| `bioacoustics/detections/insect` | Insect detections only |
+| `bioacoustics/detections/soil` | Soil acoustics detections only |
+
+The topic prefix (`bioacoustics`) is configurable in `config/settings.yaml`.
+
+### Payload
+
+Each message is a JSON object:
+
+```json
+{
+  "session_id": "a3f1b2c4",
+  "window_name": "dawn_chorus",
+  "date": "2026-05-01",
+  "time": "05:23:11",
+  "classifier": "bird",
+  "species_common": "Robin",
+  "species_scientific": "Erithacus rubecula",
+  "confidence": 0.8731,
+  "call_number_in_session": 3,
+  "latitude": 51.8403,
+  "longitude": -1.3625
+}
+```
+
+### Monitor live detections
+
+```bash
+mosquitto_sub -t "bioacoustics/#" -v
+```
+
+### Connection modes
+
+#### Mode A — Bridge (recommended for cloud or public WiFi)
+
+Run a local Mosquitto broker and configure it to bridge to a cloud broker such as EMQX Cloud. The Python code connects to `localhost` with no credentials; Mosquitto handles authentication to the remote broker transparently.
+
+```yaml
+# config/settings.yaml
+mqtt:
+  enabled: true
+  host: "localhost"
+  port: 1883
+  topic_prefix: "bioacoustics"
+```
+
+See [Mosquitto bridge setup](#mosquitto-bridge-to-emqx-cloud) below for the broker-side config.
+
+#### Mode B — Direct (fixed IP or local network)
+
+Connect the Python code straight to a remote or local broker. Set `tls: true` when connecting to a TLS-secured broker (port 8883). Add credentials to `config/secrets.yaml` (see [Credentials](#credentials)).
+
+```yaml
+# config/settings.yaml
+mqtt:
+  enabled: true
+  host: "your-broker-ip-or-hostname"
+  port: 8883
+  tls: true
+  topic_prefix: "bioacoustics"
+```
+
+Set `enabled: false` to disable MQTT without removing the configuration.
+
+### Credentials
+
+Broker credentials are kept out of `settings.yaml` (which is committed to git) and stored in a local-only file instead.
+
+```bash
+cp config/secrets.yaml.example config/secrets.yaml
+```
+
+Edit `config/secrets.yaml` and fill in your username and password:
+
+```yaml
+mqtt:
+  username: "your-username"
+  password: "your-password"
+```
+
+`config/secrets.yaml` is listed in `.gitignore` and will never be committed. `config/secrets.yaml.example` is committed as a safe template.
+
+In bridge mode (Mode A) credentials are not needed here — they live in the Mosquitto bridge config on the host machine, outside the repository.
+
+### Mosquitto bridge to EMQX Cloud
+
+Create `/etc/mosquitto/conf.d/emqx_bridge.conf`:
+
+```
+connection emqx-cloud
+address your-broker.emqxsl.com:8883
+
+bridge_cafile /etc/ssl/certs/ca-certificates.crt
+bridge_tls_version tlsv1.3
+
+remote_username your-username
+remote_password your-password
+
+topic bioacoustics/# out 0
+
+cleansession true
+start_type automatic
+```
+
+```bash
+sudo systemctl restart mosquitto
+```
+
+---
+
 ## Configuration
 
 Edit `config/settings.yaml` to adjust behaviour without touching code.
@@ -119,6 +248,12 @@ schedule:
     nocturnal:              # triggers a 23:00 night window if detected
       - "Tawny Owl"
       - "Barn Owl"
+
+mqtt:
+  enabled: true
+  host: "localhost"
+  port: 1883
+  topic_prefix: "bioacoustics"
 ```
 
 To listen on a specific microphone, run `list-devices` and set `audio.device` to the device index.
@@ -142,7 +277,9 @@ Times shift daily with sunrise/sunset. Run `status` to see exact times for today
 
 ```
 ├── config/
-│   └── settings.yaml               # All configuration
+│   ├── settings.yaml               # All configuration (safe to commit)
+│   ├── secrets.yaml                # Broker credentials — gitignored, never committed
+│   └── secrets.yaml.example        # Template for secrets.yaml
 ├── src/ecoacoustics/
 │   ├── audio/
 │   │   ├── capture.py              # Microphone stream → audio chunks
@@ -154,7 +291,8 @@ Times shift daily with sunrise/sunset. Run `status` to see exact times for today
 │   │   ├── insect.py               # Stub — plug in AVES fine-tune or sklearn model
 │   │   └── soil.py                 # Energy + spectral centroid baseline
 │   ├── output/
-│   │   └── logger.py               # Console display + CSV writing
+│   │   ├── logger.py               # Console display + CSV writing
+│   │   └── mqtt_publisher.py       # Publishes detections to MQTT broker
 │   ├── pipeline.py                 # Orchestrates capture → classify → log
 │   ├── scheduler.py                # Dawn/dusk window calculation and adaptation
 │   ├── session.py                  # Per-session species call counting
@@ -203,6 +341,17 @@ The pipeline will automatically set up the correct audio stream and frequency fi
 | `astral` | Sunrise/sunset calculation |
 | `rich` | Terminal display |
 | `PyYAML` | Configuration loading |
+| `paho-mqtt` | MQTT client for live detection publishing |
+
+---
+
+## Licence
+
+This project is released under the [MIT Licence](LICENSE).
+
+Bioacoustic Stream Engine was built at Blenheim Palace to advance open research into acoustic biodiversity monitoring. We believe this kind of tooling should be freely available to conservation practitioners, researchers, and developers everywhere. You are welcome to use, adapt, and build on this work — and we actively encourage contributions that extend coverage to new species groups, habitats, or classifier models.
+
+If you use this project in your own work, a credit or citation is appreciated but not required.
 
 ---
 
@@ -233,6 +382,20 @@ Bat species identification is powered by **BatDetect2**, developed by [Oisin Mac
 - GitHub: [github.com/macaodha/batdetect2](https://github.com/macaodha/batdetect2)
 - Covers 17 UK and European bat species; trained on British bat call datasets
 - Requires an ultrasonic microphone (≥192 kHz) — see bat classifier documentation
+
+---
+
+### Blenheim Palace Innovation Team
+
+Bioacoustic Stream Engine has been shaped over several years by the Innovation Team and students at Blenheim Palace whose curiosity, experimentation, and fieldwork laid the groundwork for this system.
+
+| Contributor | Role |
+|---|---|
+| **Harry Hanson** | Ecoacoustics research and development |
+| **Tawhid Shahrior** | Ecoacoustics research and development |
+| **Dr. Matthias Rolf** | Ecoacoustics research and development |
+
+Their collective contribution — from early prototypes to field testing — is what made this project possible.
 
 ---
 
