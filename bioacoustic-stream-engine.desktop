@@ -1,0 +1,10 @@
+[Desktop Entry]
+Version=1.0
+Type=Application
+Name=BioAcoustic Stream Engine (BASE)
+Comment=Real-time acoustic biodiversity monitoring — Blenheim Palace
+Exec=/home/dgreen/Documents/Ecoacoustics/start_web.sh
+Icon=utilities-system-monitor
+Terminal=true
+Categories=Science;Education;
+StartupNotify=true

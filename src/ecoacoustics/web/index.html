@@ -1,0 +1,39 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>BioAcoustic Stream Engine (BASE)</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;600;700&family=JetBrains+Mono:wght@400;600&display=swap" rel="stylesheet">
+  <link rel="stylesheet" href="style.css">
+</head>
+<body>
+
+<header>
+  <span class="logo">🌿 BioAcoustic Stream Engine (BASE)</span>
+  <span class="version" id="version">v—</span>
+  <div class="spacer"></div>
+  <div id="conn-warning">⚠ Server unreachable</div>
+  <div class="status-pill idle" id="status-pill">
+    <div class="dot"></div>
+    <span id="status-label">Idle</span>
+  </div>
+</header>
+
+<nav>
+  <a href="#dashboard" class="active"><span class="icon">⬛</span> Dashboard</a>
+  <a href="#schedule"><span class="icon">🕐</span> Schedule</a>
+  <a href="#clips"><span class="icon">🎵</span> Clips</a>
+  <a href="#reports"><span class="icon">📊</span> Reports</a>
+  <a href="#settings"><span class="icon">⚙</span> Settings</a>
+  <div class="nav-footer">Blenheim Palace<br>Innovation</div>
+</nav>
+
+<main id="main"></main>
+
+<div id="toast"></div>
+
+<script src="app.js"></script>
+</body>
+</html>

@@ -18,7 +18,7 @@ Author: David Green, Blenheim Palace
 import csv
 import datetime
 from pathlib import Path
-from typing import TYPE_CHECKING, Optional
+from typing import TYPE_CHECKING, Callable, Optional
 
 from rich.console import Console
 
@@ -67,6 +67,7 @@ class DetectionLogger:
         latitude: Optional[float] = None,
         longitude: Optional[float] = None,
         mqtt_publisher: Optional["MqttPublisher"] = None,
+        detection_callback: Optional[Callable] = None,
     ):
         """
         Args:
@@ -77,12 +78,14 @@ class DetectionLogger:
             latitude: Recording latitude written to every detection row.
             longitude: Recording longitude written to every detection row.
             mqtt_publisher: Optional publisher; if set, each detection is broadcast via MQTT.
+            detection_callback: Optional callable(det, session, call_n) for live consumers (e.g. WebSocket).
         """
         self._console = console
         self._min_confidence = min_confidence
         self._lat = latitude
         self._lon = longitude
         self._mqtt = mqtt_publisher
+        self._detection_callback = detection_callback
 
         self._det_writer, self._det_file = self._open_csv(detections_csv, _DETECTION_FIELDS)
         self._sess_writer, self._sess_file = self._open_csv(sessions_csv, _SESSION_FIELDS)
@@ -109,6 +112,8 @@ class DetectionLogger:
             self._write_console(det, call_n)
             if self._mqtt:
                 self._mqtt.publish(det, session, call_n)
+            if self._detection_callback:
+                self._detection_callback(det, session, call_n)
 
     def write_session_summary(self, session: Session) -> None:
         """Append per-species summary rows to sessions.csv and print the table.

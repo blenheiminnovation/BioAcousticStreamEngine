@@ -1,4 +1,4 @@
-# Bioacoustic Stream Engine
+# BioAcoustic Stream Engine (BASE)
 
 *Created by **David Green**, Blenheim Palace*
 
@@ -10,14 +10,16 @@ This project was born from a belief that technology can bring people closer to t
 
 ## Features
 
-- **Live microphone streaming** — continuous audio capture with configurable chunk size
+- **Live microphone streaming** — continuous audio capture with configurable chunk size; multiple concurrent microphones supported, each assigned to a different classifier
 - **BirdNET identification** — powered by [BirdNET-Analyzer](https://github.com/kahst/BirdNET-Analyzer) via [birdnetlib](https://github.com/joeweiss/birdnetlib); identifies 6,000+ species
+- **Bat detection** — powered by [BatDetect2](https://github.com/macaodha/batdetect2); 17 UK/European species; requires an ultrasonic microphone (≥192 kHz)
 - **Scheduled listening** — automatically wakes and sleeps around dawn chorus, morning song, and dusk windows calculated from local sunrise/sunset
 - **Adaptive scheduling** — if nocturnal species (owls, nightjars) are detected, a night window is automatically added
 - **Detailed logging** — every detection logged with date, time, species, scientific name, confidence, and call number within the session
 - **Session summaries** — per-window species totals with max and average confidence
-- **Live MQTT streaming** — every detection published as JSON in real time; integrate with dashboards, alerting, or any MQTT-compatible tool
-- **Extensible architecture** — bat, insect, and soil classifiers are structured and ready for model plug-ins
+- **Live MQTT streaming** — every detection published as JSON in real time; direct or bridge connection; configurable via web UI
+- **Browser dashboard** — full web UI for live monitoring, schedule management, audio clips, reports, and settings
+- **Extensible architecture** — insect and soil classifiers are structured and ready for model plug-ins
 
 ---
 
@@ -57,6 +59,35 @@ python3 -m venv .venv
 
 ---
 
+## Web UI
+
+BioAcoustic Stream Engine (BASE) includes a browser-based dashboard for managing and monitoring the system without touching the command line.
+
+```bash
+.venv/bin/python -m ecoacoustics.main web
+```
+
+A browser tab opens automatically at `http://localhost:8000`. A desktop launcher is also provided — double-click `bioacoustic-stream-engine.desktop` to start.
+
+### Pages
+
+| Page | Features |
+|---|---|
+| **Dashboard** | Live detection feed, real-time VU meter, per-device start/stop controls, today's species count and call totals |
+| **Schedule** | Today's listening windows, add/remove custom windows, assign classifiers and microphones per organism group |
+| **Clips** | Browse saved audio clips by species and classifier, play in browser, delete clips |
+| **Reports** | Date and species filtering, daily summary table, download detections/sessions as CSV, clear all logs |
+| **Settings** | Recording location (name, lat/lon), MQTT broker configuration with connection test, classifier device assignment |
+
+### Web command options
+
+```bash
+.venv/bin/python -m ecoacoustics.main web --port 8080   # change port
+.venv/bin/python -m ecoacoustics.main web --no-browser  # don't auto-open browser
+```
+
+---
+
 ## Commands
 
 | Command | Description |
@@ -65,6 +96,7 @@ python3 -m venv .venv
 | `schedule` | Auto wake/sleep based on configured listening windows. |
 | `status` | Display today's schedule and species detected so far. |
 | `list-devices` | Print available audio input devices and their indices. |
+| `web` | Launch the browser UI. Optional `--port` and `--no-browser`. |
 
 ---
 
@@ -141,7 +173,9 @@ Each message is a JSON object:
   "confidence": 0.8731,
   "call_number_in_session": 3,
   "latitude": 51.8403,
-  "longitude": -1.3625
+  "longitude": -1.3625,
+  "location_name": "Blenheim Palace",
+  "device_name": "Built-in Microphone"
 }
 ```
 
@@ -285,27 +319,47 @@ Times shift daily with sunrise/sunset. Run `status` to see exact times for today
 │   ├── secrets.yaml                # Broker credentials — gitignored, never committed
 │   └── secrets.yaml.example        # Template for secrets.yaml
 ├── src/ecoacoustics/
+│   ├── api/
+│   │   ├── app.py                  # FastAPI application and WebSocket broadcast
+│   │   ├── pipeline_manager.py     # Pipeline lifecycle management for web UI
+│   │   ├── state.py                # Shared state across API routes
+│   │   └── routes/
+│   │       ├── status.py           # Pipeline start/stop, system status
+│   │       ├── schedule.py         # Listening window CRUD
+│   │       ├── detections.py       # Detection history and summary
+│   │       ├── clips.py            # Audio clip library
+│   │       ├── reports.py          # CSV downloads and log management
+│   │       ├── devices.py          # Audio input device listing
+│   │       └── settings.py         # Location, MQTT, classifier settings
 │   ├── audio/
 │   │   ├── capture.py              # Microphone stream → audio chunks
-│   │   └── processor.py           # Resample + bandpass filter per classifier
+│   │   └── processor.py            # Resample + bandpass filter per classifier
 │   ├── classifiers/
 │   │   ├── base.py                 # BaseClassifier ABC and Detection dataclass
 │   │   ├── bird.py                 # BirdNET via birdnetlib (active)
-│   │   ├── bat.py                  # Stub — plug in BatDetective2 or similar
+│   │   ├── bat.py                  # BatDetect2 — 17 UK/European species
 │   │   ├── insect.py               # Stub — plug in AVES fine-tune or sklearn model
 │   │   └── soil.py                 # Energy + spectral centroid baseline
 │   ├── output/
 │   │   ├── logger.py               # Console display + CSV writing
 │   │   └── mqtt_publisher.py       # Publishes detections to MQTT broker
+│   ├── web/
+│   │   ├── index.html              # Single-page app shell
+│   │   ├── style.css               # Dark nature-themed design system
+│   │   └── app.js                  # Dashboard, schedule, clips, reports, settings
 │   ├── pipeline.py                 # Orchestrates capture → classify → log
 │   ├── scheduler.py                # Dawn/dusk window calculation and adaptation
 │   ├── session.py                  # Per-session species call counting
-│   └── main.py                     # CLI entry point
+│   └── main.py                     # CLI entry point (wake, schedule, status, web)
 ├── tests/
 │   └── test_pipeline.py
+├── start_web.sh                    # One-click web UI launcher
+├── bioacoustic-stream-engine.desktop  # Desktop launcher
 └── output/                         # Created on first run
     ├── detections.csv
-    └── sessions.csv
+    ├── sessions.csv
+    ├── clips/                      # Per-species audio clip library
+    └── known_species.json          # All-time species registry
 ```
 
 ---
@@ -323,12 +377,14 @@ The pipeline will automatically set up the correct audio stream and frequency fi
 
 ## Roadmap
 
-- [ ] Bat classifier (requires ultrasonic microphone, ≥192 kHz)
-- [ ] Insect classifier — grasshoppers and crickets (2–20 kHz)
+- [x] Bat classifier — BatDetect2, 17 UK/European species (requires ultrasonic microphone ≥192 kHz)
+- [x] Web dashboard — live detections, schedule management, audio clips, reports, settings
+- [x] MQTT live feed — direct and bridge connection modes, configurable via UI
+- [x] Multi-microphone support — per-classifier device assignment
+- [ ] Insect classifier — grasshoppers and bush crickets (2–20 kHz)
 - [ ] Soil acoustics classifier — earthworm and root activity (50–2000 Hz)
-- [ ] Web dashboard for live detection display
 - [ ] Species activity heatmaps by time of day and season
-- [ ] Automated weekly detection reports
+- [ ] Automated weekly detection reports via email
 
 ---
 
@@ -346,6 +402,9 @@ The pipeline will automatically set up the correct audio stream and frequency fi
 | `rich` | Terminal display |
 | `PyYAML` | Configuration loading |
 | `paho-mqtt` | MQTT client for live detection publishing |
+| `fastapi` | REST API and WebSocket server for web UI |
+| `uvicorn` | ASGI server |
+| `websockets` | WebSocket support |
 
 ---
 
@@ -353,7 +412,7 @@ The pipeline will automatically set up the correct audio stream and frequency fi
 
 This project is released under the [MIT Licence](LICENSE).
 
-Bioacoustic Stream Engine was built at Blenheim Palace to advance open research into acoustic biodiversity monitoring. We believe this kind of tooling should be freely available to conservation practitioners, researchers, and developers everywhere. You are welcome to use, adapt, and build on this work — and we actively encourage contributions that extend coverage to new species groups, habitats, or classifier models.
+BioAcoustic Stream Engine (BASE) was built at Blenheim Palace to advance open research into acoustic biodiversity monitoring. We believe this kind of tooling should be freely available to conservation practitioners, researchers, and developers everywhere. You are welcome to use, adapt, and build on this work — and we actively encourage contributions that extend coverage to new species groups, habitats, or classifier models.
 
 If you use this project in your own work, a credit or citation is appreciated but not required.
 
@@ -391,7 +450,7 @@ Bat species identification is powered by **BatDetect2**, developed by [Oisin Mac
 
 ### Blenheim Palace Innovation Team
 
-Bioacoustic Stream Engine has been shaped over several years by the Innovation Team and students at Blenheim Palace whose curiosity, experimentation, and fieldwork laid the groundwork for this system.
+BioAcoustic Stream Engine (BASE) has been shaped over several years by the Innovation Team and students at Blenheim Palace whose curiosity, experimentation, and fieldwork laid the groundwork for this system.
 
 | Contributor | Role |
 |---|---|
@@ -409,4 +468,4 @@ This project was inspired by the work and vision of **Dr. Curt Lamberth**, whose
 
 ---
 
-*Blenheim Palace Innovation — Bioacoustic Stream Engine*
+*Blenheim Palace Innovation — BioAcoustic Stream Engine (BASE)*

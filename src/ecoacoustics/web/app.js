@@ -1,0 +1,978 @@
+/* Bioacoustic Stream Engine — single-page frontend */
+
+const MAX_FEED_ITEMS = 60;
+const POLL_INTERVAL = 8000;
+
+const CLASSIFIERS = [
+  { key: 'all',    label: 'All',      icon: '◈' },
+  { key: 'bird',   label: 'Birds',    icon: '🐦' },
+  { key: 'bat',    label: 'Bats',     icon: '🦇' },
+  { key: 'insect', label: 'Insects',  icon: '🦗' },
+  { key: 'soil',   label: 'Soil',     icon: '🌱' },
+];
+
+const state = {
+  page: 'dashboard',
+  status: null,
+  detections: [],
+  classifierFilter: 'all',
+  connected: true,
+};
+
+/* ── API ── */
+const api = {
+  async _request(path, opts = {}) {
+    try {
+      const r = await fetch(path, opts);
+      if (!r.ok) {
+        const body = await r.json().catch(() => ({}));
+        throw new Error(body.detail || `Server error (${r.status})`);
+      }
+      return r.json();
+    } catch (e) {
+      if (e.name === 'TypeError') throw new Error('Cannot reach server — check that the web UI is still running.');
+      throw e;
+    }
+  },
+  get(path) { return this._request(path); },
+  post(path, body = {}) {
+    return this._request(path, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(body),
+    });
+  },
+  del(path) { return this._request(path, { method: 'DELETE' }); },
+};
+
+/* ── Toast ── */
+function toast(msg, type = 'info', duration = 3500) {
+  const el = document.getElementById('toast');
+  el.textContent = msg;
+  el.className = `show toast-${type}`;
+  clearTimeout(el._t);
+  el._t = setTimeout(() => { el.className = ''; }, duration);
+}
+
+/* ── Button loading ── */
+function btnLoad(btn, label) { btn.dataset.loading = '1'; btn._orig = btn.textContent; btn.textContent = label; }
+function btnDone(btn) { delete btn.dataset.loading; if (btn._orig) btn.textContent = btn._orig; }
+
+/* ── Connection warning ── */
+function setConnected(ok) {
+  if (state.connected === ok) return;
+  state.connected = ok;
+  document.getElementById('conn-warning').classList.toggle('show', !ok);
+}
+
+/* ── Header ── */
+function updateHeader(status) {
+  if (!status) return;
+  document.getElementById('version').textContent = `v${status.version}`;
+  const pill = document.getElementById('status-pill');
+  const lbl = document.getElementById('status-label');
+  const running = Object.values(status.pipelines || {}).filter(p => p.state !== 'idle');
+  if (running.length === 0) {
+    pill.className = 'status-pill idle'; lbl.textContent = 'Idle';
+  } else if (running.length === 1) {
+    pill.className = `status-pill ${running[0].state}`;
+    lbl.textContent = `${running[0].state === 'listening' ? 'Listening' : 'Scheduled'} — ${running[0].device_name}`;
+  } else {
+    pill.className = 'status-pill listening';
+    lbl.textContent = `${running.length} devices active`;
+  }
+}
+
+/* ── State banner ── */
+function updateStateBanner(pipelines) {
+  const banner = document.getElementById('state-banner');
+  if (!banner) return;
+  const running = Object.values(pipelines).filter(p => p.state !== 'idle');
+  if (running.length === 0) {
+    banner.className = 'state-banner';
+    banner.querySelector('.banner-title').textContent = 'Ready to listen';
+    banner.querySelector('.banner-sub').textContent = 'Select a device and start listening, or run the automated schedule.';
+  } else if (running.length === 1) {
+    const p = running[0];
+    banner.className = `state-banner ${p.state}`;
+    banner.querySelector('.banner-title').textContent = p.state === 'listening' ? '● Listening now' : '● Scheduled mode running';
+    banner.querySelector('.banner-sub').textContent = `${p.device_name}  ·  Window: ${p.window || 'manual'}  ·  Started ${fmtTime(p.started_at)}`;
+  } else {
+    banner.className = 'state-banner listening';
+    banner.querySelector('.banner-title').textContent = `● ${running.length} devices listening`;
+    banner.querySelector('.banner-sub').textContent = running.map(p => p.device_name).join(', ');
+  }
+}
+
+function fmtTime(iso) {
+  if (!iso) return '';
+  try { return new Date(iso).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }); } catch { return ''; }
+}
+
+/* ── Organism tabs ── */
+function renderTabs(containerId) {
+  const counts = {};
+  CLASSIFIERS.forEach(c => counts[c.key] = 0);
+  state.detections.forEach(d => {
+    counts['all']++;
+    if (counts[d.classifier] !== undefined) counts[d.classifier]++;
+    else counts[d.classifier] = 1;
+  });
+
+  return `<div class="tabs" id="${containerId}">
+    ${CLASSIFIERS.map(c => `
+      <button class="tab ${state.classifierFilter === c.key ? 'active' : ''}"
+              onclick="setFilter('${c.key}')">
+        ${c.icon} ${c.label}
+        <span class="tab-count">${counts[c.key] || 0}</span>
+      </button>`).join('')}
+  </div>`;
+}
+
+function setFilter(key) {
+  state.classifierFilter = key;
+  // Re-render tabs
+  const tabsEl = document.getElementById('feed-tabs');
+  if (tabsEl) tabsEl.outerHTML = renderTabs('feed-tabs');
+  // Re-render feed
+  const feed = document.getElementById('live-feed');
+  if (feed) {
+    const visible = state.classifierFilter === 'all'
+      ? state.detections
+      : state.detections.filter(d => d.classifier === state.classifierFilter);
+    feed.innerHTML = visible.slice(0, MAX_FEED_ITEMS).map(detectionCard).join('');
+  }
+}
+
+/* ── Router ── */
+const router = {
+  init() {
+    window.addEventListener('hashchange', () => this.navigate(location.hash.slice(1) || 'dashboard'));
+    document.querySelectorAll('nav a').forEach(a => {
+      a.addEventListener('click', e => { e.preventDefault(); location.hash = a.getAttribute('href').slice(1); });
+    });
+    this.navigate(location.hash.slice(1) || 'dashboard');
+  },
+  navigate(page) {
+    state.page = page;
+    document.querySelectorAll('nav a').forEach(a =>
+      a.classList.toggle('active', a.getAttribute('href') === `#${page}`)
+    );
+    ({ dashboard: renderDashboard, schedule: renderSchedule, clips: renderClips, reports: renderReports, settings: renderSettings }[page] || renderDashboard)();
+  },
+};
+
+/* ── WebSocket ── */
+const ws = {
+  socket: null,
+  connect() {
+    const proto = location.protocol === 'https:' ? 'wss' : 'ws';
+    this.socket = new WebSocket(`${proto}://${location.host}/ws`);
+    this.socket.onmessage = e => { try { this.onMessage(JSON.parse(e.data)); } catch (_) {} };
+    this.socket.onclose = () => setTimeout(() => this.connect(), 2000);
+  },
+  onMessage(data) {
+    if (data.type === 'detection') {
+      state.detections.unshift(data);
+      if (state.detections.length > MAX_FEED_ITEMS) state.detections.pop();
+      if (state.page === 'dashboard') prependDetection(data);
+      const tabsEl = document.getElementById('feed-tabs');
+      if (tabsEl) tabsEl.outerHTML = renderTabs('feed-tabs');
+    } else if (data.type === 'audio_level') {
+      updateVuMeter(data.db);
+    }
+  },
+};
+
+/* ── Status polling ── */
+async function pollStatus() {
+  try {
+    state.status = await api.get('/api/status');
+    setConnected(true);
+    updateHeader(state.status);
+    if (state.page === 'dashboard') {
+      updateStateBanner(state.status.pipelines || {});
+      refreshDevicePanel();
+    }
+  } catch (_) { setConnected(false); }
+}
+
+/* ─────────────────────────── DASHBOARD ─────────────────────────── */
+function renderDashboard() {
+  document.getElementById('main').innerHTML = `
+    <div class="grid-4">
+      <div class="card stat" id="stat-species"><div class="value">—</div><div class="label">Species today</div></div>
+      <div class="card stat" id="stat-calls"><div class="value">—</div><div class="label">Calls today</div></div>
+      <div class="card stat" id="stat-window"><div class="value" style="font-size:1rem">—</div><div class="label">Active window</div></div>
+      <div class="card stat" id="stat-disk"><div class="value">—</div><div class="label">Disk free (GB)</div></div>
+    </div>
+
+    <div class="card">
+      <div class="card-title">Status</div>
+      <div class="state-banner" id="state-banner">
+        <div class="banner-dot"></div>
+        <div class="banner-text">
+          <div class="banner-title">Ready to listen</div>
+          <div class="banner-sub">Select a device and start listening, or run the automated schedule.</div>
+        </div>
+      </div>
+    </div>
+
+    <div class="card">
+      <div class="card-title">Recording Devices</div>
+      <div id="device-panel"><div class="empty">Loading devices...</div></div>
+    </div>
+
+    <div class="card" style="flex:1">
+      <div class="card-title">Live Detections</div>
+      <div class="vu-meter" id="vu-meter">
+        <span class="vu-label">🎙 Audio in</span>
+        <div class="vu-bar-wrap"><div class="vu-bar" id="vu-bar"></div></div>
+        <span class="vu-db" id="vu-db"><span class="vu-no-signal">no signal</span></span>
+      </div>
+      ${renderTabs('feed-tabs')}
+      <div class="feed" id="live-feed"></div>
+    </div>
+  `;
+
+  refreshDashboard();
+}
+
+async function refreshDashboard() {
+  if (state.page !== 'dashboard') return;
+  try {
+    const [statusData, summary] = await Promise.all([
+      api.get('/api/status'),
+      api.get('/api/detections/summary'),
+    ]);
+    state.status = statusData;
+    setConnected(true);
+    updateHeader(statusData);
+    updateStateBanner(statusData.pipelines || {});
+
+    document.getElementById('stat-species').querySelector('.value').textContent = summary.species_count ?? '—';
+    document.getElementById('stat-calls').querySelector('.value').textContent = summary.total_calls ?? '—';
+    document.getElementById('stat-window').querySelector('.value').textContent = statusData.schedule.active_window || 'None';
+    document.getElementById('stat-disk').querySelector('.value').textContent = statusData.disk_free_gb ?? '—';
+
+    await refreshDevicePanel();
+  } catch (err) { setConnected(false); }
+}
+
+async function refreshDevicePanel() {
+  const panel = document.getElementById('device-panel');
+  if (!panel) return;
+  try {
+    const [devData, statusData] = await Promise.all([
+      api.get('/api/devices'),
+      state.status ? Promise.resolve(state.status) : api.get('/api/status'),
+    ]);
+    const pipelines = statusData.pipelines || {};
+
+    if (!devData.devices.length) {
+      panel.innerHTML = '<div class="empty">No audio input devices found. Check that a microphone is connected.</div>';
+      return;
+    }
+
+    panel.innerHTML = `<div class="device-grid">${devData.devices.map(d => {
+      // Use the source name as the pipeline key so each physical mic gets its own slot
+      const key = d.is_default ? 'default' : `src_${d.index}`;
+      const pip = pipelines[key];
+      const isRunning = pip && pip.state !== 'idle';
+      const safeLabel = (d.label || d.name).replace(/'/g, '');
+      const hz = (d.sample_rate / 1000).toFixed(1);
+      const stateTag = d.state === 'RUNNING' ? '<span style="color:var(--primary)">● active</span>'
+                     : d.state === 'SUSPENDED' ? '<span style="color:var(--muted)">○ suspended</span>'
+                     : '';
+      return `
+        <div class="device-row ${isRunning ? 'running' : ''}">
+          <div class="device-info">
+            <div class="device-name">${d.is_default ? '★ ' : ''}${d.label || d.name}</div>
+            <div class="device-meta">${d.channels}ch · ${hz}kHz · ${stateTag}</div>
+          </div>
+          <div class="device-status ${isRunning ? 'running' : 'idle'}">
+            ${isRunning ? `● ${pip.state} — ${pip.window || ''}` : '○ Idle'}
+          </div>
+          <div class="device-actions">
+            ${isRunning
+              ? `<button class="btn btn-sm btn-danger" onclick="stopDevice('${key}', this)">■ Stop</button>`
+              : `<select id="mode-${d.index}">
+                   <option value="wake">Listen now</option>
+                   <option value="schedule">Schedule</option>
+                 </select>
+                 <input type="number" placeholder="∞ min" min="1" max="1440"
+                   style="width:70px;padding:5px 8px;background:var(--surface);border:1px solid var(--border);border-radius:var(--radius);color:var(--text);font-size:0.78rem"
+                   id="dur-${d.index}">
+                 <button class="btn btn-sm btn-primary"
+                   onclick="startDevice('${key}','${safeLabel}',${d.is_default ? 'null' : d.index},this)">▶ Start</button>`
+            }
+          </div>
+        </div>`;
+    }).join('')}</div>`;
+  } catch (err) {
+    panel.innerHTML = `<div class="empty" style="color:var(--danger)">${err.message}</div>`;
+  }
+}
+
+async function startDevice(deviceKey, deviceName, deviceIndex, btn) {
+  const modeEl = document.getElementById(`mode-${deviceIndex}`);
+  const durEl = document.getElementById(`dur-${deviceIndex}`);
+  const mode = modeEl ? modeEl.value : 'wake';
+  const dur = durEl ? parseInt(durEl.value) || null : null;
+  btnLoad(btn, '⟳');
+  try {
+    // device_index null = use system default (correct routing via PipeWire)
+    const params = new URLSearchParams({ device_key: deviceKey, device_name: deviceName });
+    if (deviceIndex !== null) params.set('device_index', deviceIndex);
+    if (mode === 'wake') {
+      if (dur) params.set('duration_minutes', dur);
+      await api.post(`/api/pipeline/wake?${params}`);
+    } else {
+      await api.post(`/api/pipeline/schedule?${params}`);
+    }
+    toast(`Started — ${deviceName}`, 'success', 5000);
+    await pollStatus();
+  } catch (err) {
+    toast(err.message, 'error', 6000);
+    btnDone(btn);
+  }
+}
+
+async function stopDevice(deviceKey, btn) {
+  btnLoad(btn, '⟳');
+  try {
+    await api.post(`/api/pipeline/stop?device_key=${deviceKey}`);
+    toast('Device stopped', 'warn', 5000);
+    await pollStatus();
+  } catch (err) {
+    toast(err.message, 'error', 6000);
+    btnDone(btn);
+  }
+}
+
+function updateVuMeter(db) {
+  const bar = document.getElementById('vu-bar');
+  const label = document.getElementById('vu-db');
+  if (!bar || !label) return;
+  // Map -60dB→0% to 0dB→100%
+  const pct = Math.max(0, Math.min(100, (db + 60) / 60 * 100));
+  bar.style.width = pct + '%';
+  bar.className = 'vu-bar' + (pct > 85 ? ' high' : pct > 65 ? ' mid' : '');
+  label.textContent = db.toFixed(1) + ' dB';
+}
+
+function prependDetection(det) {
+  const feed = document.getElementById('live-feed');
+  if (!feed) return;
+  if (state.classifierFilter !== 'all' && det.classifier !== state.classifierFilter) return;
+  feed.insertAdjacentHTML('afterbegin', detectionCard(det));
+  while (feed.children.length > MAX_FEED_ITEMS) feed.lastChild.remove();
+}
+
+function confClass(c) { return c >= 0.75 ? 'conf-high' : c >= 0.5 ? 'conf-mid' : 'conf-low'; }
+
+function detectionCard(det) {
+  const pct = Math.round(det.confidence * 100);
+  const classifierInfo = CLASSIFIERS.find(c => c.key === det.classifier);
+  const icon = classifierInfo ? classifierInfo.icon : '◈';
+  const deviceTag = det.device_name && det.device_name !== 'Default'
+    ? `<span class="classifier-badge" style="color:var(--accent)">${det.device_name}</span>` : '';
+  return `
+    <div class="detection-card">
+      <span class="classifier-badge">${icon} ${det.classifier}</span>
+      <div style="flex:1">
+        <div class="species">${det.species_common}</div>
+        <div class="scientific">${det.species_scientific}</div>
+      </div>
+      ${deviceTag}
+      <span class="conf ${confClass(det.confidence)}">${pct}%</span>
+      <span class="time">${det.time}</span>
+    </div>`;
+}
+
+/* ─────────────────────────── SCHEDULE ─────────────────────────── */
+async function renderSchedule() {
+  document.getElementById('main').innerHTML = `
+    <div class="card">
+      <div class="card-title">Today's Listening Windows</div>
+      <div id="schedule-table"><div class="empty">Loading...</div></div>
+    </div>
+    <div class="card">
+      <div class="card-title">Add Custom Window</div>
+      <div class="form-row">
+        <div class="form-group"><label>Name</label><input type="text" id="w-name" placeholder="my_window"></div>
+        <div class="form-group"><label>Anchor</label>
+          <select id="w-anchor">
+            <option value="sunrise">Sunrise</option><option value="sunset">Sunset</option>
+            <option value="noon">Noon</option><option value="fixed">Fixed time</option>
+          </select>
+        </div>
+        <div class="form-group"><label>Offset (min)</label><input type="number" id="w-offset" value="0" style="width:90px"></div>
+        <div class="form-group"><label>Duration (min)</label><input type="number" id="w-duration" value="60" style="width:90px"></div>
+        <div class="form-group" id="fixed-time-group" style="display:none"><label>Fixed time (HH:MM)</label><input type="text" id="w-fixed" placeholder="23:00"></div>
+        <div class="form-group" style="justify-content:flex-end"><button class="btn btn-primary" id="btn-add-window">Add Window</button></div>
+      </div>
+    </div>
+    <div class="card">
+      <div class="card-title">Classifiers & Microphones</div>
+      <p style="font-size:0.82rem;color:var(--muted);margin-bottom:14px">
+        Select which classifiers are active and which microphone each one uses.
+        Changes apply when the next listening session starts.
+      </p>
+      <div id="classifier-device-panel"><div class="empty">Loading...</div></div>
+      <div style="margin-top:14px">
+        <button class="btn btn-primary" id="btn-save-classifiers">Save</button>
+      </div>
+    </div>
+  `;
+  document.getElementById('w-anchor').addEventListener('change', e =>
+    document.getElementById('fixed-time-group').style.display = e.target.value === 'fixed' ? '' : 'none'
+  );
+  document.getElementById('btn-add-window').addEventListener('click', addWindow);
+  document.getElementById('btn-save-classifiers').addEventListener('click', saveClassifiers);
+  await Promise.all([loadSchedule(), loadClassifierDevices()]);
+}
+
+const _CLF_META = {
+  bird:   { icon: '🐦', label: 'Birds',    note: 'Standard microphone (48kHz)' },
+  bat:    { icon: '🦇', label: 'Bats',     note: 'Requires ultrasonic mic (≥192kHz)' },
+  insect: { icon: '🦗', label: 'Insects',  note: 'Standard microphone (44.1kHz)' },
+  soil:   { icon: '🌱', label: 'Soil',     note: 'Surface / contact microphone (22kHz)' },
+};
+
+async function loadClassifierDevices() {
+  const panel = document.getElementById('classifier-device-panel');
+  if (!panel) return;
+  try {
+    const [clfData, devData] = await Promise.all([
+      api.get('/api/settings/classifiers'),
+      api.get('/api/devices'),
+    ]);
+
+    const deviceOptions = (selected) => {
+      const none = `<option value="" ${!selected ? 'selected' : ''}>System default</option>`;
+      const opts = devData.devices.map(d =>
+        `<option value="${d.index}" ${String(selected) === String(d.index) ? 'selected' : ''}>${d.label || d.name}</option>`
+      ).join('');
+      return none + opts;
+    };
+
+    panel.innerHTML = ['bird', 'bat', 'insect', 'soil'].map(key => {
+      const meta = _CLF_META[key];
+      const isActive = clfData.active.includes(key);
+      const assignedDevice = clfData.devices[key];
+      return `
+        <div class="device-row" style="margin-bottom:6px" id="clf-row-${key}">
+          <div class="device-info">
+            <div class="device-name">${meta.icon} ${meta.label}</div>
+            <div class="device-meta">${meta.note}</div>
+          </div>
+          <label style="display:flex;align-items:center;gap:6px;font-size:0.82rem;color:var(--muted);cursor:pointer">
+            <input type="checkbox" id="clf-active-${key}" ${isActive ? 'checked' : ''}
+              style="accent-color:var(--primary);width:16px;height:16px">
+            Active
+          </label>
+          <div class="form-group" style="margin:0">
+            <label style="font-size:0.72rem">Microphone</label>
+            <select id="clf-device-${key}" style="min-width:200px">
+              ${deviceOptions(assignedDevice)}
+            </select>
+          </div>
+        </div>`;
+    }).join('');
+  } catch (err) {
+    panel.innerHTML = `<div class="empty" style="color:var(--danger)">${err.message}</div>`;
+  }
+}
+
+async function saveClassifiers() {
+  const btn = document.getElementById('btn-save-classifiers');
+  btnLoad(btn, '⟳ Saving...');
+  const active = ['bird', 'bat', 'insect', 'soil'].filter(k =>
+    document.getElementById(`clf-active-${k}`)?.checked
+  );
+  const devices = {};
+  for (const key of ['bird', 'bat', 'insect', 'soil']) {
+    const val = document.getElementById(`clf-device-${key}`)?.value;
+    devices[key] = val === '' ? null : (isNaN(parseInt(val)) ? val : parseInt(val));
+  }
+  try {
+    await api.post('/api/settings/classifiers', { active, devices });
+    toast('Classifier settings saved — restart pipeline to apply', 'success', 5000);
+  } catch (err) {
+    toast(err.message, 'error', 6000);
+  } finally { btnDone(btn); }
+}
+
+async function loadSchedule() {
+  const el = document.getElementById('schedule-table');
+  if (!el) return;
+  try {
+    const data = await api.get('/api/schedule');
+    if (!data.windows.length) { el.innerHTML = '<div class="empty">No windows configured.</div>'; return; }
+    el.innerHTML = `
+      <table>
+        <thead><tr><th>Window</th><th>Start</th><th>End</th><th>Duration</th><th>Status</th><th></th></tr></thead>
+        <tbody>${data.windows.map(w => `
+          <tr class="${w.active ? 'active-row' : ''}">
+            <td>${w.name}</td><td class="window-time">${w.start}</td>
+            <td class="window-time">${w.end}</td><td>${w.duration_mins} min</td>
+            <td>${w.active ? '<span class="badge-active">● ACTIVE</span>' : ''}</td>
+            <td>${w.editable ? `<button class="btn btn-sm btn-danger" onclick="deleteWindow('${w.name}')">Remove</button>` : ''}</td>
+          </tr>`).join('')}
+        </tbody>
+      </table>`;
+  } catch (err) { el.innerHTML = `<div class="empty" style="color:var(--danger)">${err.message}</div>`; }
+}
+
+async function addWindow() {
+  const btn = document.getElementById('btn-add-window');
+  const name = document.getElementById('w-name').value.trim();
+  const anchor = document.getElementById('w-anchor').value;
+  const offset_mins = parseInt(document.getElementById('w-offset').value) || 0;
+  const duration_mins = parseInt(document.getElementById('w-duration').value);
+  const fixed_time = anchor === 'fixed' ? document.getElementById('w-fixed').value.trim() : null;
+  if (!name) { toast('Window name is required', 'warn'); return; }
+  if (!duration_mins) { toast('Duration is required', 'warn'); return; }
+  btnLoad(btn, '⟳ Adding...');
+  try {
+    await api.post('/api/schedule/windows', { name, anchor, offset_mins, duration_mins, fixed_time });
+    toast(`Window '${name}' added`, 'success');
+    document.getElementById('w-name').value = '';
+    await loadSchedule();
+  } catch (err) { toast(err.message, 'error', 6000); } finally { btnDone(btn); }
+}
+
+async function deleteWindow(name) {
+  try {
+    await api.del(`/api/schedule/windows/${name}`);
+    toast(`Window '${name}' removed`, 'warn');
+    await loadSchedule();
+  } catch (err) { toast(err.message, 'error', 6000); }
+}
+
+/* ─────────────────────────── CLIPS ─────────────────────────── */
+async function renderClips() {
+  document.getElementById('main').innerHTML = `
+    <div class="card" style="flex:1">
+      <div class="card-title">Audio Clip Library</div>
+      <div class="tabs" id="clips-tabs">
+        ${CLASSIFIERS.map(c => `<button class="tab ${c.key === 'all' ? 'active' : ''}"
+          onclick="filterClips('${c.key}', this)">${c.icon} ${c.label}</button>`).join('')}
+      </div>
+      <div class="clips-layout">
+        <div>
+          <div class="card-title">Species</div>
+          <div class="species-list" id="species-list"><div class="empty">Loading...</div></div>
+        </div>
+        <div>
+          <div class="card-title" id="clips-title">Select a species</div>
+          <div class="clips-grid" id="clips-grid"><div class="empty">Select a species to browse clips.</div></div>
+        </div>
+      </div>
+    </div>
+  `;
+  await loadSpeciesList('all');
+}
+
+async function loadSpeciesList(classifierFilter = 'all') {
+  const el = document.getElementById('species-list');
+  if (!el) return;
+  el.innerHTML = '<div class="empty">Loading...</div>';
+  try {
+    const url = classifierFilter === 'all' ? '/api/clips' : `/api/clips?classifier=${classifierFilter}`;
+    const data = await api.get(url);
+    if (!data.species.length) {
+      el.innerHTML = `<div class="empty">No ${classifierFilter === 'all' ? '' : classifierFilter + ' '}clips recorded yet.</div>`;
+      return;
+    }
+    el.innerHTML = data.species.map(s => `
+      <div class="species-item" data-dir="${s.dir}" onclick="loadClips('${s.dir}','${s.name}')">
+        <span>${s.name}</span><span class="count">${s.clip_count}</span>
+      </div>`).join('');
+  } catch (err) { el.innerHTML = `<div class="empty" style="color:var(--danger)">${err.message}</div>`; }
+}
+
+function filterClips(key, btn) {
+  document.querySelectorAll('#clips-tabs .tab').forEach(t => t.classList.remove('active'));
+  btn.classList.add('active');
+  loadSpeciesList(key);
+}
+
+async function loadClips(dir, name) {
+  document.querySelectorAll('.species-item').forEach(el =>
+    el.classList.toggle('active', el.dataset.dir === dir)
+  );
+  document.getElementById('clips-title').textContent = name;
+  const grid = document.getElementById('clips-grid');
+  grid.innerHTML = '<div class="empty">Loading...</div>';
+  try {
+    const data = await api.get(`/api/clips/${dir}`);
+    if (!data.clips.length) { grid.innerHTML = '<div class="empty">No clips for this species.</div>'; return; }
+    grid.innerHTML = data.clips.map(c => `
+      <div class="clip-row">
+        <div class="clip-meta">${c.date} ${c.time}<br><span class="conf ${confClass(c.confidence)}">${Math.round(c.confidence * 100)}% conf</span></div>
+        <audio controls src="${c.url}" preload="none"></audio>
+        <button class="btn btn-sm btn-danger" onclick="deleteClip('${dir}','${c.filename}',this)">✕</button>
+      </div>`).join('');
+  } catch (err) { grid.innerHTML = `<div class="empty" style="color:var(--danger)">${err.message}</div>`; }
+}
+
+async function deleteClip(dir, filename, btn) {
+  btnLoad(btn, '...');
+  try {
+    await api.del(`/api/clips/${dir}/${filename}`);
+    btn.closest('.clip-row').remove();
+    toast('Clip deleted', 'warn');
+  } catch (err) { toast(err.message, 'error', 6000); btnDone(btn); }
+}
+
+/* ─────────────────────────── REPORTS ─────────────────────────── */
+async function renderReports() {
+  const today = new Date().toISOString().slice(0, 10);
+  const weekAgo = new Date(Date.now() - 7 * 86400000).toISOString().slice(0, 10);
+
+  // Load species list for filter dropdown
+  let speciesOptions = '<option value="">All species</option>';
+  try {
+    const sp = await api.get('/api/reports/species');
+    speciesOptions += sp.species.map(s => `<option value="${s}">${s}</option>`).join('');
+  } catch (_) {}
+
+  document.getElementById('main').innerHTML = `
+    <div class="card">
+      <div class="card-title">Filters</div>
+      <div class="form-row" style="align-items:flex-end">
+        <div class="form-group">
+          <label>From</label>
+          <input type="date" id="r-from" value="${weekAgo}">
+        </div>
+        <div class="form-group">
+          <label>To</label>
+          <input type="date" id="r-to" value="${today}">
+        </div>
+        <div class="form-group">
+          <label>Species</label>
+          <select id="r-species" style="min-width:200px">${speciesOptions}</select>
+        </div>
+        <div class="form-group" style="justify-content:flex-end">
+          <button class="btn btn-primary" id="btn-load-report">Load Report</button>
+        </div>
+      </div>
+    </div>
+
+    <div class="card">
+      <div class="card-title">Summary</div>
+      <div id="report-content"><div class="empty">Select filters and click Load Report.</div></div>
+    </div>
+
+    <div class="card">
+      <div class="card-title">Download</div>
+      <div class="download-row">
+        <button class="btn btn-outline" id="btn-dl-detections">⬇ Detections CSV</button>
+        <button class="btn btn-outline" id="btn-dl-sessions">⬇ Sessions CSV</button>
+      </div>
+      <p style="font-size:0.75rem;color:var(--muted);margin-top:10px">
+        Downloads respect the date range and species filter selected above.
+      </p>
+    </div>
+
+    <div class="card">
+      <div class="card-title" style="color:var(--danger)">Danger Zone</div>
+      <p style="font-size:0.82rem;color:var(--muted);margin-bottom:12px">
+        Permanently deletes all detection and session log files. This cannot be undone.
+      </p>
+      <button class="btn btn-danger" id="btn-clear-logs">🗑 Clear All Logs</button>
+    </div>
+  `;
+
+  document.getElementById('btn-load-report').addEventListener('click', loadReport);
+  document.getElementById('btn-dl-detections').addEventListener('click', () => downloadReport('detections'));
+  document.getElementById('btn-dl-sessions').addEventListener('click', () => downloadReport('sessions'));
+  document.getElementById('btn-clear-logs').addEventListener('click', confirmClearLogs);
+}
+
+async function loadReport() {
+  const btn = document.getElementById('btn-load-report');
+  const from = document.getElementById('r-from').value;
+  const to = document.getElementById('r-to').value;
+  const el = document.getElementById('report-content');
+  el.innerHTML = '<div class="empty">Loading...</div>';
+  btnLoad(btn, '⟳ Loading...');
+  const species = document.getElementById('r-species')?.value || '';
+  const speciesParam = species ? `&species=${encodeURIComponent(species)}` : '';
+  try {
+    const data = await api.get(`/api/reports/summary?date_from=${from}&date_to=${to}${speciesParam}`);
+    const filterLabel = data.species ? ` — ${data.species}` : '';
+    if (!data.days.length) { el.innerHTML = `<div class="empty">No data for this period${filterLabel}.</div>`; return; }
+    el.innerHTML = `
+      ${data.species ? `<p style="font-size:0.82rem;color:var(--accent);margin-bottom:12px">Filtered: ${data.species}</p>` : ''}
+      <div class="grid-2" style="margin-bottom:16px">
+        <div class="stat"><div class="value">${data.totals.sessions}</div><div class="label">Sessions</div></div>
+        <div class="stat"><div class="value">${data.totals.total_calls}</div><div class="label">Total calls</div></div>
+      </div>
+      <table>
+        <thead><tr><th>Date</th><th>Sessions</th>${data.species ? '' : '<th>Species</th>'}<th>Total Calls</th></tr></thead>
+        <tbody>${data.days.map(d => `
+          <tr><td class="window-time">${d.date}</td><td>${d.sessions}</td>${data.species ? '' : `<td>${d.species_count}</td>`}<td>${d.total_calls}</td></tr>`).join('')}
+        </tbody>
+      </table>`;
+  } catch (err) {
+    el.innerHTML = `<div class="empty" style="color:var(--danger)">${err.message}</div>`;
+    toast(err.message, 'error', 6000);
+  } finally { btnDone(btn); }
+}
+
+function downloadReport(type) {
+  const from = document.getElementById('r-from')?.value || '';
+  const to = document.getElementById('r-to')?.value || '';
+  const species = document.getElementById('r-species')?.value || '';
+  let url = `/api/reports/download/${type}?date_from=${from}&date_to=${to}`;
+  if (species) url += `&species=${encodeURIComponent(species)}`;
+  const a = document.createElement('a');
+  a.href = url; a.download = ''; a.click();
+}
+
+async function confirmClearLogs() {
+  const confirmed = window.confirm(
+    'Are you sure you want to delete ALL detection and session logs?\n\nThis cannot be undone.'
+  );
+  if (!confirmed) return;
+  const btn = document.getElementById('btn-clear-logs');
+  btnLoad(btn, '⟳ Clearing...');
+  try {
+    const result = await api.del('/api/reports/logs');
+    toast(`Logs cleared: ${result.cleared.join(', ') || 'nothing to delete'}`, 'warn', 6000);
+  } catch (err) {
+    toast(err.message, 'error', 6000);
+  } finally { btnDone(btn); }
+}
+
+/* ─────────────────────────── SETTINGS ─────────────────────────── */
+async function renderSettings() {
+  document.getElementById('main').innerHTML = `
+    <div class="card">
+      <div class="card-title">Recording Location</div>
+      <p style="font-size:0.82rem;color:var(--muted);margin-bottom:16px">
+        Used for BirdNET species filtering, CSV logs, and MQTT detection messages.
+      </p>
+      <div class="form-row">
+        <div class="form-group" style="flex:2">
+          <label>Location Name</label>
+          <input type="text" id="loc-name" placeholder="e.g. Blenheim Palace" style="min-width:220px">
+        </div>
+        <div class="form-group">
+          <label>Latitude</label>
+          <input type="number" id="loc-lat" step="0.0001" placeholder="51.8403" style="width:120px">
+        </div>
+        <div class="form-group">
+          <label>Longitude</label>
+          <input type="number" id="loc-lon" step="0.0001" placeholder="-1.3625" style="width:120px">
+        </div>
+        <div class="form-group" style="justify-content:flex-end">
+          <button class="btn btn-primary" id="btn-save-location">Save</button>
+        </div>
+      </div>
+      <div id="location-status"></div>
+    </div>
+
+    <div class="card">
+      <div class="card-title">MQTT Live Feed</div>
+      <p style="font-size:0.82rem;color:var(--muted);margin-bottom:16px">
+        Publish every detection as JSON to an MQTT broker in real time.
+        Credentials are stored locally and never committed to git.
+      </p>
+
+      <div class="form-row" style="margin-bottom:16px;align-items:center;gap:20px">
+        <label style="display:flex;align-items:center;gap:8px;font-size:0.88rem;cursor:pointer">
+          <input type="checkbox" id="mqtt-enabled" style="accent-color:var(--primary);width:16px;height:16px">
+          <span>Enable MQTT publishing</span>
+        </label>
+      </div>
+
+      <div class="form-row" style="margin-bottom:16px">
+        <div class="form-group">
+          <label>Connection mode</label>
+          <select id="mqtt-mode">
+            <option value="direct">Direct — connect straight to broker</option>
+            <option value="bridge">Bridge — via local Mosquitto</option>
+          </select>
+        </div>
+        <div class="form-group" style="flex:1">
+          <label>Topic Prefix</label>
+          <input type="text" id="mqtt-prefix" placeholder="bioacoustics">
+        </div>
+      </div>
+
+      <div id="mqtt-direct-fields">
+        <div class="form-row" style="margin-bottom:10px">
+          <div class="form-group" style="flex:2">
+            <label>Broker Host</label>
+            <input type="text" id="mqtt-host" placeholder="hostname or IP">
+          </div>
+          <div class="form-group" style="width:110px">
+            <label>Port</label>
+            <input type="number" id="mqtt-port" placeholder="1883" style="width:90px">
+          </div>
+          <label style="display:flex;align-items:center;gap:6px;font-size:0.82rem;color:var(--muted);cursor:pointer;align-self:flex-end;padding-bottom:10px">
+            <input type="checkbox" id="mqtt-tls" style="accent-color:var(--primary);width:14px;height:14px">
+            TLS / SSL
+          </label>
+        </div>
+        <div class="form-row">
+          <div class="form-group" style="flex:1">
+            <label>Username</label>
+            <input type="text" id="mqtt-user" placeholder="optional" autocomplete="off">
+          </div>
+          <div class="form-group" style="flex:1">
+            <label>Password</label>
+            <input type="password" id="mqtt-pass" placeholder="leave blank to keep existing" autocomplete="new-password">
+          </div>
+          <div id="mqtt-pass-note" style="align-self:flex-end;padding-bottom:10px;font-size:0.73rem;color:var(--muted);white-space:nowrap"></div>
+        </div>
+      </div>
+
+      <div id="mqtt-bridge-fields" style="display:none">
+        <div class="form-row" style="margin-bottom:10px">
+          <div class="form-group" style="flex:2">
+            <label>Local Mosquitto Host</label>
+            <input type="text" id="mqtt-bridge-host" value="localhost" placeholder="localhost">
+          </div>
+          <div class="form-group" style="width:110px">
+            <label>Port</label>
+            <input type="number" id="mqtt-bridge-port" value="1883" style="width:90px">
+          </div>
+        </div>
+        <div style="background:var(--surface2);border:1px solid var(--border);border-radius:var(--radius);padding:12px;font-size:0.78rem;color:var(--muted);line-height:1.6">
+          <strong style="color:var(--text)">Mosquitto bridge setup</strong><br>
+          Python connects to local Mosquitto — add a bridge config on the host machine to forward to your remote broker:<br>
+          <code style="display:block;margin-top:6px;color:var(--accent);font-family:var(--mono)">/etc/mosquitto/conf.d/bridge.conf</code>
+          Credentials for the remote broker go in that file only — not here.
+          Run <code style="color:var(--accent);font-family:var(--mono)">sudo systemctl restart mosquitto</code> after editing.
+        </div>
+      </div>
+
+      <div class="btn-group" style="margin-top:16px">
+        <button class="btn btn-primary" id="btn-save-mqtt">Save</button>
+        <button class="btn btn-outline" id="btn-test-mqtt">Test Connection</button>
+      </div>
+      <div id="mqtt-test-result" style="margin-top:10px;font-size:0.82rem"></div>
+    </div>
+  `;
+
+  // Load location
+  try {
+    const loc = await api.get('/api/settings/location');
+    document.getElementById('loc-name').value = loc.name || '';
+    document.getElementById('loc-lat').value = loc.latitude || '';
+    document.getElementById('loc-lon').value = loc.longitude || '';
+  } catch (err) { toast(err.message, 'error'); }
+
+  // Load MQTT
+  try {
+    const m = await api.get('/api/settings/mqtt');
+    document.getElementById('mqtt-enabled').checked = m.enabled;
+    document.getElementById('mqtt-mode').value = m.mode || 'direct';
+    document.getElementById('mqtt-prefix').value = m.topic_prefix || 'bioacoustics';
+    document.getElementById('mqtt-host').value = m.host || '';
+    document.getElementById('mqtt-port').value = m.port || 1883;
+    document.getElementById('mqtt-tls').checked = m.tls || false;
+    document.getElementById('mqtt-user').value = m.username || '';
+    if (m.has_password) document.getElementById('mqtt-pass-note').textContent = '● password set';
+    _mqttModeChanged(m.mode || 'direct');
+  } catch (err) { toast(err.message, 'error'); }
+
+  document.getElementById('mqtt-mode').addEventListener('change', e => _mqttModeChanged(e.target.value));
+  document.getElementById('btn-save-location').addEventListener('click', saveLocation);
+  document.getElementById('btn-save-mqtt').addEventListener('click', saveMqtt);
+  document.getElementById('btn-test-mqtt').addEventListener('click', testMqtt);
+}
+
+function _mqttModeChanged(mode) {
+  const isDirect = mode === 'direct';
+  document.getElementById('mqtt-direct-fields').style.display = isDirect ? '' : 'none';
+  document.getElementById('mqtt-bridge-fields').style.display = isDirect ? 'none' : '';
+}
+
+async function saveMqtt() {
+  const btn = document.getElementById('btn-save-mqtt');
+  const password = document.getElementById('mqtt-pass').value;
+  btnLoad(btn, '⟳ Saving...');
+  const mode = document.getElementById('mqtt-mode').value;
+  const isBridge = mode === 'bridge';
+  try {
+    await api.post('/api/settings/mqtt', {
+      enabled: document.getElementById('mqtt-enabled').checked,
+      mode,
+      host: isBridge
+        ? (document.getElementById('mqtt-bridge-host').value.trim() || 'localhost')
+        : document.getElementById('mqtt-host').value.trim(),
+      port: isBridge
+        ? (parseInt(document.getElementById('mqtt-bridge-port').value) || 1883)
+        : (parseInt(document.getElementById('mqtt-port').value) || 1883),
+      tls: isBridge ? false : document.getElementById('mqtt-tls').checked,
+      topic_prefix: document.getElementById('mqtt-prefix').value.trim() || 'bioacoustics',
+      username: isBridge ? null : (document.getElementById('mqtt-user').value.trim() || null),
+      password: isBridge ? null : (password || null),
+    });
+    if (password) {
+      document.getElementById('mqtt-pass').value = '';
+      document.getElementById('mqtt-pass-note').textContent = '● password set';
+    }
+    toast('MQTT settings saved — restart pipeline to apply', 'success', 5000);
+  } catch (err) {
+    toast(err.message, 'error', 6000);
+  } finally { btnDone(btn); }
+}
+
+async function testMqtt() {
+  const btn = document.getElementById('btn-test-mqtt');
+  const result = document.getElementById('mqtt-test-result');
+  btnLoad(btn, '⟳ Testing...');
+  result.textContent = '';
+  try {
+    const data = await api.post('/api/settings/mqtt/test', {});
+    if (data.connected) {
+      result.style.color = 'var(--primary)';
+      result.textContent = '✓ Connected successfully';
+    } else {
+      result.style.color = 'var(--danger)';
+      result.textContent = `✗ ${data.error || 'Connection failed'}`;
+    }
+  } catch (err) {
+    result.style.color = 'var(--danger)';
+    result.textContent = `✗ ${err.message}`;
+  } finally { btnDone(btn); }
+}
+
+async function saveLocation() {
+  const btn = document.getElementById('btn-save-location');
+  const name = document.getElementById('loc-name').value.trim();
+  const latitude = parseFloat(document.getElementById('loc-lat').value);
+  const longitude = parseFloat(document.getElementById('loc-lon').value);
+  if (!name) { toast('Location name is required', 'warn'); return; }
+  if (isNaN(latitude) || isNaN(longitude)) { toast('Valid latitude and longitude required', 'warn'); return; }
+  btnLoad(btn, '⟳ Saving...');
+  try {
+    await api.post('/api/settings/location', { name, latitude, longitude });
+    toast(`Location saved — ${name}`, 'success', 5000);
+    document.getElementById('location-status').innerHTML =
+      `<p style="font-size:0.78rem;color:var(--muted);margin-top:10px">Restart the pipeline to apply changes to the active session.</p>`;
+  } catch (err) {
+    toast(err.message, 'error', 6000);
+  } finally { btnDone(btn); }
+}
+
+/* ── Boot ── */
+router.init();
+ws.connect();
+pollStatus();
+setInterval(pollStatus, POLL_INTERVAL);
+
+window.deleteWindow = deleteWindow;
+window.loadClips = loadClips;
+window.filterClips = filterClips;
+window.deleteClip = deleteClip;
+window.startDevice = startDevice;
+window.stopDevice = stopDevice;
+window.setFilter = setFilter;

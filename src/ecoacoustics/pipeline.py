@@ -17,11 +17,14 @@ Author: David Green, Blenheim Palace
 """
 
 import concurrent.futures
+import math
 import signal
 import threading
 import time
 from pathlib import Path
-from typing import Optional
+from typing import Callable, Optional
+
+import numpy as np
 
 import yaml
 from rich.console import Console
@@ -51,7 +54,7 @@ class Pipeline:
         pipeline.close()
     """
 
-    def __init__(self, config_path: str = "config/settings.yaml"):
+    def __init__(self, config_path: str = "config/settings.yaml", detection_callback: Optional[Callable] = None, level_callback: Optional[Callable] = None, device_override=None):
         """Load configuration and prepare all subsystems.
 
         Args:
@@ -98,6 +101,7 @@ class Pipeline:
             latitude=bird_cfg.get("latitude"),
             longitude=bird_cfg.get("longitude"),
             mqtt_publisher=mqtt_publisher,
+            detection_callback=detection_callback,
         )
         self._clip_manager = ClipManager(
             clips_dir=clips_cfg.get("dir", "output/clips"),
@@ -107,15 +111,24 @@ class Pipeline:
         )
 
         self._stop_event = threading.Event()
-        self._captures: dict[int, AudioCapture] = {}
+        self._level_callback = level_callback
+        # Keyed by (sample_rate, device) so each classifier can use a different mic
+        self._captures: dict[tuple, AudioCapture] = {}
+        self._clf_capture_key: dict[str, tuple] = {}
         self._processors: dict[str, AudioProcessor] = {}
 
+        clf_devices = self._cfg.get("classifiers", {}).get("devices", {})
+        default_device = device_override if device_override is not None else self._cfg["audio"].get("device")
+
         for clf in self._classifiers:
-            if clf.sample_rate not in self._captures:
-                self._captures[clf.sample_rate] = AudioCapture(
+            _device = clf_devices.get(clf.name, default_device)
+            _key = (clf.sample_rate, str(_device))
+            self._clf_capture_key[clf.name] = _key
+            if _key not in self._captures:
+                self._captures[_key] = AudioCapture(
                     sample_rate=clf.sample_rate,
                     chunk_duration=self._cfg["audio"]["chunk_duration"],
-                    device=self._cfg["audio"].get("device"),
+                    device=_device,
                     channels=self._cfg["audio"].get("channels", 1),
                     max_queue_size=self._cfg["audio"].get("max_queue_size", 20),
                 )
@@ -156,8 +169,9 @@ class Pipeline:
             timer.daemon = True
             timer.start()
 
-        signal.signal(signal.SIGINT, self._handle_sigint)
-        signal.signal(signal.SIGTERM, self._handle_sigint)
+        if threading.current_thread() is threading.main_thread():
+            signal.signal(signal.SIGINT, self._handle_sigint)
+            signal.signal(signal.SIGTERM, self._handle_sigint)
 
         for clf in self._classifiers:
             clf.load()
@@ -216,7 +230,7 @@ class Pipeline:
             clf: The classifier to run.
             session: The active session for recording detections.
         """
-        capture = self._captures[clf.sample_rate]
+        capture = self._captures[self._clf_capture_key[clf.name]]
         processor = self._processors[clf.name]
         consecutive_errors = 0
 
@@ -224,6 +238,15 @@ class Pipeline:
             chunk = capture.get_chunk(timeout=1.0)
             if chunk is None:
                 continue
+
+            if self._level_callback:
+                try:
+                    rms = float(np.sqrt(np.mean(chunk.data ** 2)))
+                    db = 20 * math.log10(max(rms, 1e-10))
+                    print(f"[LEVEL] db={db:.1f} rms={rms:.6f}", flush=True)
+                    self._level_callback(db)
+                except Exception as _lev_exc:
+                    print(f"[LEVEL] error: {_lev_exc}", flush=True)
 
             try:
                 processed = processor.process(chunk)

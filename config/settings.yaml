@@ -1,116 +1,73 @@
-# Ecoacoustics monitoring configuration
-
 audio:
-  device: null          # null = system default; set to device index or name to override
   channels: 1
-  chunk_duration: 3.0   # seconds per analysis window
-  max_queue_size: 20    # chunks buffered before oldest are dropped (~60s headroom at 3s/chunk)
-
+  chunk_duration: 3.0
+  device: null
+  max_queue_size: 20
+bat:
+  capture_rate: 256000
+  min_class_confidence: 0.4
+  min_det_confidence: 0.5
+  silence_threshold: 0.0001
+bird:
+  latitude: 51.8403
+  longitude: -1.3625
+  min_confidence: 0.35
+  sample_rate: 48000
 classifiers:
   active:
-    - bird
-
-bird:
-  sample_rate: 48000
-  min_confidence: 0.35
-  latitude: 51.8403     # Blenheim Palace
-  longitude: -1.3625
-
-bat:
-  # capture_rate must match your ultrasonic microphone's maximum sample rate
-  # Common values: 192000 (Dodotronic Ultramic 384K), 256000, 384000
-  capture_rate: 256000
-  min_det_confidence: 0.5    # minimum call-presence probability
-  min_class_confidence: 0.4  # minimum species-identity probability
-  silence_threshold: 0.0001  # RMS below this skips inference entirely
-
-insect:
-  sample_rate: 44100
-  min_confidence: 0.5
-  freq_min_hz: 2000
-  freq_max_hz: 20000
-
-soil:
-  sample_rate: 22050
-  min_confidence: 0.4
-  energy_threshold: 0.01
-  freq_min_hz: 50
-  freq_max_hz: 2000
-
-# Listening schedule (times relative to sunrise/sunset at configured lat/lon)
-schedule:
-  timezone: "Europe/London"
-  windows:
-    - name: dawn_chorus       # Robin starts before sunrise; peak bird song
-      anchor: sunrise
-      offset_mins: -30
-      duration_mins: 150
-
-    - name: morning_song      # Secondary activity peak
-      anchor: sunrise
-      offset_mins: 150
-      duration_mins: 60
-
-    - name: dusk              # Evening song / roost calls
-      anchor: sunset
-      offset_mins: -60
-      duration_mins: 90
-
-  # Species that unlock extra listening windows when detected
-  # Uncomment the bat_windows block below when running with an ultrasonic mic.
-  # These replace the bird windows — run bird and bat monitoring separately
-  # unless you have two microphones at different sample rates.
-  #
-  # bat_windows:
-  #   - name: bat_dusk_emergence
-  #     anchor: sunset
-  #     offset_mins: -15
-  #     duration_mins: 120       # peak emergence 15 min before to 90 min after sunset
-  #   - name: bat_night_roost
-  #     anchor: fixed
-  #     offset_mins: 0
-  #     duration_mins: 60
-  #     fixed_time: "01:00"      # second activity peak for some species
-  #   - name: bat_pre_dawn
-  #     anchor: sunrise
-  #     offset_mins: -60
-  #     duration_mins: 60        # return-to-roost flight
-
-  adaptive:
-    nocturnal:                # adds a 60-min window at 23:00 if any of these seen
-      - "Tawny Owl"
-      - "Barn Owl"
-      - "Little Owl"
-      - "European Nightjar"
-    early_morning:            # extends dawn window by 30 min if detected
-      - "Common Nightingale"
-      - "Song Thrush"
-
+  - bird
 clips:
-  dir: "output/clips"                   # root folder; one sub-folder per species
-  species_db: "output/known_species.json"  # all-time species registry
-  max_per_species: 100                  # rotate out lowest-confidence clips beyond this
-
-output:
-  console: true
-  detections_csv: "output/detections.csv"   # one row per detection
-  sessions_csv: "output/sessions.csv"       # one row per session-species summary
-  min_confidence: 0.35
-
+  dir: output/clips
+  max_per_species: 100
+  species_db: output/known_species.json
+insect:
+  freq_max_hz: 20000
+  freq_min_hz: 2000
+  min_confidence: 0.5
+  sample_rate: 44100
+location:
+  latitude: 51.8403
+  longitude: -1.3625
+  name: Weaveley Solar
 mqtt:
   enabled: true
-  topic_prefix: "bioacoustics"
-
-  # --- Mode A: bridge ---
-  # Run a local Mosquitto broker and configure it to bridge to a cloud broker
-  # (e.g. EMQX Cloud). The Python code connects to localhost with no credentials;
-  # Mosquitto handles authentication to the remote broker transparently.
-  # host: "localhost"
-  # port: 1883
-
-  # --- Mode B: direct (active) ---
-  # Connect the Python code straight to a remote broker (fixed IP or cloud).
-  # Set host/port to the remote broker and add credentials to config/secrets.yaml.
-  host: "u1d78101.ala.eu-central-1.emqxsl.com"
+  host: u1d78101.ala.eu-central-1.emqxsl.com
+  mode: direct
   port: 8883
   tls: true
+  topic_prefix: bioacoustics
+output:
+  console: true
+  detections_csv: output/detections.csv
+  min_confidence: 0.35
+  sessions_csv: output/sessions.csv
+schedule:
+  adaptive:
+    early_morning:
+    - Common Nightingale
+    - Song Thrush
+    nocturnal:
+    - Tawny Owl
+    - Barn Owl
+    - Little Owl
+    - European Nightjar
+  timezone: Europe/London
+  windows:
+  - anchor: sunrise
+    duration_mins: 150
+    name: dawn_chorus
+    offset_mins: -30
+  - anchor: sunrise
+    duration_mins: 60
+    name: morning_song
+    offset_mins: 150
+  - anchor: sunset
+    duration_mins: 90
+    name: dusk
+    offset_mins: -60
+soil:
+  energy_threshold: 0.01
+  freq_max_hz: 2000
+  freq_min_hz: 50
+  min_confidence: 0.4
+  sample_rate: 22050

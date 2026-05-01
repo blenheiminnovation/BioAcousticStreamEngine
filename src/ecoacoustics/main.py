@@ -183,6 +183,23 @@ def _sleep_interruptible(seconds: float, poll: float = 5.0) -> None:
         remaining -= poll
 
 
+def cmd_web(args) -> None:
+    """Start the FastAPI web UI and open a browser tab."""
+    import threading
+    import webbrowser
+    import uvicorn
+
+    url = f"http://localhost:{args.port}"
+    if not args.no_browser:
+        def _open():
+            time.sleep(1.5)
+            webbrowser.open(url)
+        threading.Thread(target=_open, daemon=True).start()
+
+    _console.print(f"\n[bold green]BioAcoustic Stream Engine (BASE)[/bold green] — web UI at [cyan]{url}[/cyan]\n")
+    uvicorn.run("ecoacoustics.api.app:app", host=args.host, port=args.port, reload=False)
+
+
 def main() -> None:
     """Parse command-line arguments and dispatch to the appropriate command."""
     parser = argparse.ArgumentParser(
@@ -219,6 +236,12 @@ def main() -> None:
     # --- list-devices ---
     sub.add_parser("list-devices", help="List available audio input devices")
 
+    # --- web ---
+    p_web = sub.add_parser("web", help="Launch the web UI (opens browser automatically)")
+    p_web.add_argument("--host", default="0.0.0.0", metavar="HOST")
+    p_web.add_argument("--port", type=int, default=8000, metavar="PORT")
+    p_web.add_argument("--no-browser", action="store_true", help="Don't open browser automatically")
+
     args = parser.parse_args()
 
     if args.command == "wake":
@@ -230,6 +253,8 @@ def main() -> None:
     elif args.command == "list-devices":
         from ecoacoustics.audio.capture import AudioCapture
         AudioCapture.list_devices()
+    elif args.command == "web":
+        cmd_web(args)
     else:
         parser.print_help()
         sys.exit(1)

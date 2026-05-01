@@ -94,7 +94,7 @@ class ClipManager:
         with self._lock:
             species = detection.label
             is_new = species not in self._db
-            self._record_detection(species)
+            self._record_detection(species, detection.classifier)
 
             if not self._should_save(species, detection.confidence, is_new):
                 return None, is_new
@@ -217,13 +217,14 @@ class ClipManager:
     # Species registry
     # ------------------------------------------------------------------
 
-    def _record_detection(self, species: str) -> None:
+    def _record_detection(self, species: str, classifier: str = "bird") -> None:
         """Increment the detection counter and persist the registry to disk."""
         today = datetime.now().strftime("%Y-%m-%d")
         if species not in self._db:
             self._db[species] = {"first_seen": today, "total_detections": 0}
         self._db[species]["total_detections"] += 1
         self._db[species]["last_seen"] = today
+        self._db[species]["classifier"] = classifier
         self._flush_db()
 
     def _load_db(self) -> dict:
