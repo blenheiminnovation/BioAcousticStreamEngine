@@ -1,6 +1,10 @@
 # Bioacoustic Stream Engine
 
+*Created by **David Green**, Blenheim Palace*
+
 A real-time bioacoustic monitoring platform for Blenheim Palace estate. Continuously streams live audio from field microphones, identifies species using AI classifiers, and logs every detection with confidence scores, timestamps, and call counts. Built to scale across birds, bats, insects, and soil acoustics.
+
+This project was born from a belief that technology can bring people closer to the natural world. By making acoustic biodiversity monitoring open, accessible, and shareable, the goal is to engage more people with nature — learning together, sharing what we hear, and building a deeper collective understanding of the living world around us.
 
 ---
 
