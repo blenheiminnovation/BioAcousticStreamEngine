@@ -449,22 +449,11 @@ Bat species identification is powered by **BatDetect2**, developed by [Oisin Mac
 
 ---
 
-### Blenheim Palace Innovation Team
+### Contributors
 
 This project was conceived by the Blenheim Palace Innovation Team, combining our own work with contributions from pre-trained models and open research. We are excited to engage others and to learn together more about our natural world.
 
-BioAcoustic Stream Engine (BASE) has been shaped over several years by the Innovation Team and students at Blenheim Palace whose curiosity, experimentation, and fieldwork laid the groundwork for this system.
-
-| Contributor | Role |
-|---|---|
-| **Harry Hanson** | Ecoacoustics research and development |
-| **Tawhid Shahrior** | Ecoacoustics research and development |
-| **Dr. Matthias Rolf** | Ecoacoustics research and development |
-| **Max Caminow** | Innovation Team &amp; Natural Capital Team |
-| **Dr. Dave Gasca** | Innovation Team &amp; Natural Capital Team |
-| **Arnaud Fontannaz** | Innovation Team &amp; Natural Capital Team |
-
-Their collective contribution — from early prototypes to field testing — is what made this project possible.
+Harry Hanson · Tawhid Shahrior · Dr. Matthias Rolf · Max Caminow · Dr. Dave Gasca · Arnaud Fontannaz
 
 ---
 
