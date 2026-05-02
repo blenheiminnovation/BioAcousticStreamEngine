@@ -79,6 +79,7 @@ class Pipeline:
         out_cfg = self._cfg.get("output", {})
         clips_cfg = self._cfg.get("clips", {})
         mqtt_cfg = self._cfg.get("mqtt", {})
+        loc_cfg = self._cfg.get("location", {})
 
         mqtt_publisher = None
         if mqtt_cfg.get("enabled", False):
@@ -98,8 +99,9 @@ class Pipeline:
             detections_csv=out_cfg.get("detections_csv"),
             sessions_csv=out_cfg.get("sessions_csv"),
             min_confidence=out_cfg.get("min_confidence", 0.0),
-            latitude=bird_cfg.get("latitude"),
-            longitude=bird_cfg.get("longitude"),
+            latitude=loc_cfg.get("latitude", bird_cfg.get("latitude")),
+            longitude=loc_cfg.get("longitude", bird_cfg.get("longitude")),
+            location_name=loc_cfg.get("name", ""),
             mqtt_publisher=mqtt_publisher,
             detection_callback=detection_callback,
         )

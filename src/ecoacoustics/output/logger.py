@@ -40,12 +40,13 @@ _CLASSIFIER_COLOURS = {
 _DETECTION_FIELDS = [
     "session_id", "window_name", "date", "time",
     "classifier", "species_common", "species_scientific",
-    "confidence", "call_number_in_session", "latitude", "longitude",
+    "confidence", "call_number_in_session",
+    "location_name", "latitude", "longitude",
 ]
 
 _SESSION_FIELDS = [
     "session_id", "window_name", "date", "session_start", "session_end",
-    "duration_mins", "species", "total_calls", "max_confidence", "avg_confidence",
+    "duration_mins", "location_name", "species", "total_calls", "max_confidence", "avg_confidence",
 ]
 
 
@@ -66,6 +67,7 @@ class DetectionLogger:
         min_confidence: float = 0.0,
         latitude: Optional[float] = None,
         longitude: Optional[float] = None,
+        location_name: Optional[str] = None,
         mqtt_publisher: Optional["MqttPublisher"] = None,
         detection_callback: Optional[Callable] = None,
     ):
@@ -77,6 +79,7 @@ class DetectionLogger:
             min_confidence: Detections below this score are not logged anywhere.
             latitude: Recording latitude written to every detection row.
             longitude: Recording longitude written to every detection row.
+            location_name: Human-readable site name written to every detection row.
             mqtt_publisher: Optional publisher; if set, each detection is broadcast via MQTT.
             detection_callback: Optional callable(det, session, call_n) for live consumers (e.g. WebSocket).
         """
@@ -84,6 +87,7 @@ class DetectionLogger:
         self._min_confidence = min_confidence
         self._lat = latitude
         self._lon = longitude
+        self._location_name = location_name or ""
         self._mqtt = mqtt_publisher
         self._detection_callback = detection_callback
 
@@ -123,6 +127,7 @@ class DetectionLogger:
         if not self._sess_writer:
             return
         for row in session.species_rows():
+            row["location_name"] = self._location_name
             self._sess_writer.writerow(row)
         self._sess_file.flush()
         if self._console:
@@ -155,6 +160,7 @@ class DetectionLogger:
             "species_scientific": det.metadata.get("scientific_name", ""),
             "confidence": f"{det.confidence:.3f}",
             "call_number_in_session": call_n,
+            "location_name": self._location_name,
             "latitude": self._lat or "",
             "longitude": self._lon or "",
         })
