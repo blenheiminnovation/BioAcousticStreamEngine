@@ -1,86 +1,220 @@
 """
-Insect classifier — targets stridulating orthoptera (grasshoppers, crickets).
+Insect classifier — Orthoptera (grasshoppers & bush crickets).
 
-Orthoptera produce characteristic chirp patterns in the 2–20 kHz band,
-detectable with a standard microphone.  This is a structured stub awaiting
-a trained model.
+Built around OpenSoundscape's CNN model format, which is the engine used by
+OrthopterOSS (the Orthoptera classifier referenced in the 2025 ScienceDirect
+review of passive acoustic monitoring of Orthoptera).
 
-Recommended model plug-ins:
-  - AVES audio transformer (https://github.com/earthspecies/aves)
-      Pre-trained on diverse animal vocalisations; fine-tune on labelled
-      orthoptera recordings from Xeno-canto or your own field captures.
-  - Spectral features + sklearn/XGBoost
-      Extract MFCCs or mel-spectrograms and train a lightweight classifier;
-      works well when labelled estate recordings are available.
-  - BioSoundSegmenter
-      Useful as a pre-processing step to detect and isolate individual
-      chirp syllables before species-level classification.
+How to activate
+---------------
+1. Obtain a trained model — either:
+   a. Wait for OrthopterOSS to be publicly released (imminent as of 2025).
+      It will be pip-installable and target ~17 species at ~86% accuracy.
+   b. Train your own using OpenSoundscape + InsectSet459/ECOSoundSet data
+      (European coverage: ~200 species including UK targets).
 
-To activate:
-  1. Train or download a model for your target species.
-  2. Implement load() and classify() below.
-  3. Add "insect" to classifiers.active in config/settings.yaml.
+2. Place the model file at the path configured in settings.yaml:
+      insect:
+        model_path: "models/orthoptera.model"  # or .pt
+
+3. Add "insect" to classifiers.active in settings.yaml.
+   The classifier loads silently if OpenSoundscape is not installed or the
+   model file is absent — it simply returns no detections.
+
+Supported UK/European species (example — depends on model)
+-----------------------------------------------------------
+  Chorthippus brunneus        — Field Grasshopper
+  Chorthippus parallelus      — Meadow Grasshopper
+  Chorthippus albomarginatus  — Lesser Marsh Grasshopper
+  Omocestus viridulus         — Common Green Grasshopper
+  Tettigonia viridissima      — Great Green Bush-cricket
+  Roeseliana roeselii         — Roesel's Bush-cricket
+  Pholidoptera griseoaptera   — Dark Bush-cricket
+  Leptophyes punctatissima    — Speckled Bush-cricket
+  Meconema thalassinum        — Oak Bush-cricket
+  Gryllus campestris          — Field Cricket
+
+Audio
+-----
+  Sample rate : 44.1 kHz (captures full Orthoptera stridulation range)
+  Band        : 2–20 kHz (grasshopper chirps 3–8 kHz, bush crickets up to 40 kHz)
+  Microphone  : Standard microphone (unlike bats, no ultrasonic mic required for
+                most grasshopper species; bush crickets benefit from a wider-range mic)
+
+OpenSoundscape model API (for model developers)
+-----------------------------------------------
+  from opensoundscape.ml.cnn import load_model
+  model = load_model("path/to/model.model")
+  # model.classes  — list of species names
+  # model.predict(file_paths, clip_duration=3, overlap_fraction=0)
+  #   returns pd.DataFrame, index=file_paths, columns=species names, values=scores
 
 Author: David Green, Blenheim Palace
+References:
+  - OrthopterOSS (2025): 17 spp., 86.4% TPR, OpenSoundscape-based
+  - InsectSet459: Faiss et al. (2025), 459 spp., EU/UK coverage
+  - ECOSoundSet: Funosas et al. (2025), 200 EU Orthoptera spp., finely annotated
+  - OpenSoundscape: Lapp et al. (2023), Methods in Ecology and Evolution
 """
 
-from typing import Any
+import logging
+import tempfile
+from pathlib import Path
+from typing import Any, Optional
 
 import numpy as np
+import soundfile as sf
 
 from ecoacoustics.audio.capture import AudioChunk
 from ecoacoustics.classifiers.base import BaseClassifier, Detection
 
+_log = logging.getLogger(__name__)
+
 
 class InsectClassifier(BaseClassifier):
-    """Orthoptera classifier operating in the 2–20 kHz band.
+    """Orthoptera classifier using an OpenSoundscape CNN model.
 
-    Currently a structured stub.  Returns an empty list until a model is
-    wired into load() and classify().
+    Silently inactive when OpenSoundscape is not installed or no model file
+    is configured — add 'insect' to classifiers.active once a model is ready.
     """
 
     name = "insect"
 
     def __init__(self, config: dict[str, Any]):
-        """
-        Args:
-            config: Section from settings.yaml under the 'insect' key.
-                min_confidence: Minimum detection confidence (default 0.5).
-        """
         self._min_confidence: float = config.get("min_confidence", 0.5)
+        self._model_path: Optional[str] = config.get("model_path")
+        self._clip_duration: float = config.get("clip_duration", 3.0)
         self._model = None
+        self._classes: list[str] = []
 
     @property
     def sample_rate(self) -> int:
-        """44.1 kHz is sufficient to capture the full orthoptera call range."""
         return 44100
 
     @property
     def freq_min_hz(self) -> int:
-        """Lower edge of the insect bandpass filter."""
-        return 2_000
+        return 2000
 
     @property
     def freq_max_hz(self) -> int:
-        """Upper edge of the insect bandpass filter."""
-        return 20_000
+        return 20000
 
     def load(self) -> None:
-        """Load the insect detection model.  Replace with real initialisation."""
-        # TODO: load model
-        pass
+        """Load the OpenSoundscape CNN model if configured and available."""
+        if not self._model_path:
+            _log.info(
+                "InsectClassifier: no model_path configured — "
+                "add 'model_path' under 'insect' in settings.yaml once a model is available. "
+                "OrthopterOSS (2025) is the recommended source."
+            )
+            return
+
+        model_file = Path(self._model_path)
+        if not model_file.exists():
+            _log.warning(
+                "InsectClassifier: model file not found at '%s' — "
+                "classifier inactive. Download or train a model and check the path.",
+                self._model_path,
+            )
+            return
+
+        try:
+            from opensoundscape.ml.cnn import load_model as osp_load_model
+        except ImportError:
+            _log.warning(
+                "InsectClassifier: OpenSoundscape is not installed. "
+                "Install it with: pip install opensoundscape"
+            )
+            return
+
+        try:
+            _log.info("InsectClassifier: loading model from %s", self._model_path)
+            self._model = osp_load_model(str(model_file))
+            self._classes = list(self._model.classes)
+            _log.info(
+                "InsectClassifier: ready — %d species: %s",
+                len(self._classes), self._classes
+            )
+        except Exception as exc:
+            _log.error("InsectClassifier: failed to load model: %s", exc)
 
     def classify(self, chunk: AudioChunk) -> list[Detection]:
-        """Return insect detections; empty list until a model is loaded.
+        """Classify a chunk using the loaded OpenSoundscape CNN.
+
+        OpenSoundscape's CNN.predict() takes file paths, so the chunk is
+        written to a temp WAV file, classified, and the file is cleaned up.
 
         Args:
             chunk: Pre-processed audio at 44.1 kHz, bandpass 2–20 kHz.
 
         Returns:
-            List of Detection objects (empty until a model is wired in).
+            Detection objects for any species scoring above min_confidence,
+            or an empty list if no model is loaded.
         """
         if self._model is None:
             return []
 
-        # TODO: run inference
-        return []
+        audio = chunk.data.astype(np.float32)
+        detections: list[Detection] = []
+
+        try:
+            with tempfile.NamedTemporaryFile(suffix=".wav", delete=False) as tmp:
+                tmp_path = tmp.name
+
+            sf.write(tmp_path, audio, self.sample_rate, subtype="PCM_16")
+
+            scores_df = self._model.predict(
+                [tmp_path],
+                clip_duration=self._clip_duration,
+                overlap_fraction=0,
+                batch_size=1,
+                activation_layer="softmax",
+                num_workers=0,
+            )
+
+            # scores_df: index=clip paths, columns=species names, values=scores
+            if scores_df is None or scores_df.empty:
+                return []
+
+            row = scores_df.iloc[0]
+            for species, score in row.items():
+                if float(score) >= self._min_confidence:
+                    detections.append(Detection(
+                        label=species,
+                        confidence=round(float(score), 4),
+                        classifier=self.name,
+                        timestamp=chunk.timestamp,
+                        metadata={
+                            "model": str(Path(self._model_path).name),
+                            "group": _orthoptera_group(str(species)),
+                        },
+                    ))
+
+            return sorted(detections, key=lambda d: -d.confidence)
+
+        except Exception as exc:
+            _log.warning("InsectClassifier.classify error: %s", exc)
+            return []
+        finally:
+            try:
+                Path(tmp_path).unlink(missing_ok=True)
+            except Exception:
+                pass
+
+    def cleanup(self) -> None:
+        self._model = None
+
+
+def _orthoptera_group(species: str) -> str:
+    """Label a species as Grasshopper, Bush Cricket, or Cricket from its name."""
+    s = species.lower()
+    if any(w in s for w in ("grasshopper", "chorthippus", "omocestus",
+                             "stenobothrus", "gomphocerippus", "myrmeleotettix")):
+        return "Grasshopper"
+    if any(w in s for w in ("bush-cricket", "bush cricket", "tettigonia",
+                             "roesel", "pholidoptera", "leptophyes",
+                             "meconema", "conocephalus", "metrioptera")):
+        return "Bush Cricket"
+    if any(w in s for w in ("cricket", "gryllus", "acheta", "gryllotalpa")):
+        return "Cricket"
+    return "Orthoptera"

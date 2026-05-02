@@ -35,6 +35,8 @@ insect:
   freq_min_hz: 2000
   min_confidence: 0.5
   sample_rate: 44100
+  clip_duration: 3.0
+  # model_path: "models/orthoptera.model"   # uncomment when OrthopterOSS or a trained model is available
 location:
   latitude: 51.8403
   longitude: -1.3625
