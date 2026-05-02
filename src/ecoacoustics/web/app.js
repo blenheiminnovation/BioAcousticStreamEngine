@@ -711,6 +711,22 @@ async function renderReports() {
     </div>
 
     <div class="card">
+      <div class="card-title">Activity Heatmaps</div>
+      <div id="heatmap-section"><div class="heatmap-empty">Load a report above to generate heatmaps.</div></div>
+    </div>
+
+    <div class="card">
+      <div class="card-title">Download</div>
+      <div class="download-row">
+        <button class="btn btn-outline" id="btn-dl-detections">⬇ Detections CSV</button>
+        <button class="btn btn-outline" id="btn-dl-sessions">⬇ Sessions CSV</button>
+      </div>
+      <p style="font-size:0.75rem;color:var(--muted);margin-top:10px">
+        Downloads respect the date range and species filter selected above.
+      </p>
+    </div>
+
+    <div class="card">
       <div class="card-title" style="color:var(--danger)">Danger Zone</div>
       <p style="font-size:0.82rem;color:var(--muted);margin-bottom:12px">
         Permanently deletes all detection and session log files. This cannot be undone.
@@ -769,10 +785,89 @@ async function loadReport() {
           <tr><td class="window-time">${d.date}</td><td>${d.sessions}</td>${data.species ? '' : `<td>${d.species_count}</td>`}<td>${d.total_calls}</td></tr>`).join('')}
         </tbody>
       </table>`;
+    // Load heatmaps in parallel
+    loadHeatmaps(from, to, classifierParam.replace('&classifier=',''));
   } catch (err) {
     el.innerHTML = `<div class="empty" style="color:var(--danger)">${err.message}</div>`;
     toast(err.message, 'error', 6000);
   } finally { btnDone(btn); }
+}
+
+async function loadHeatmaps(from, to, classifier) {
+  const el = document.getElementById('heatmap-section');
+  if (!el) return;
+  el.innerHTML = '<div class="heatmap-empty">Loading heatmaps…</div>';
+  try {
+    let url = `/api/reports/heatmap?date_from=${from}&date_to=${to}`;
+    if (classifier) url += `&classifier=${classifier}`;
+    const data = await api.get(url);
+    const species = Object.keys(data.by_hour);
+    if (!species.length) { el.innerHTML = '<div class="heatmap-empty">No data to display.</div>'; return; }
+
+    el.innerHTML = `
+      <div style="display:grid;grid-template-columns:1fr 1fr;gap:20px;flex-wrap:wrap">
+        <div>
+          <div class="heatmap-title">Time of Day</div>
+          <div class="heatmap-wrap" id="hm-hour"></div>
+        </div>
+        <div>
+          <div class="heatmap-title">Month of Year</div>
+          <div class="heatmap-wrap" id="hm-month"></div>
+        </div>
+      </div>
+      <div class="heatmap-legend">
+        <span>Fewer</span><div class="heatmap-legend-bar"></div><span>More detections</span>
+      </div>`;
+
+    renderHeatmap('hm-hour', species, data.by_hour,
+      Array.from({length:24}, (_,i) => `${String(i).padStart(2,'0')}:00`));
+
+    const MONTHS = ['Jan','Feb','Mar','Apr','May','Jun','Jul','Aug','Sep','Oct','Nov','Dec'];
+    renderHeatmap('hm-month', species, data.by_month, MONTHS);
+  } catch (err) {
+    el.innerHTML = `<div class="heatmap-empty" style="color:var(--danger)">${err.message}</div>`;
+  }
+}
+
+function renderHeatmap(containerId, species, data, colLabels) {
+  const el = document.getElementById(containerId);
+  if (!el) return;
+  const nCols = colLabels.length;
+
+  // Compute global max for colour scaling
+  let maxVal = 1;
+  species.forEach(s => { data[s].forEach(v => { if (v > maxVal) maxVal = v; }); });
+
+  const cellToColor = (v) => {
+    if (!v) return 'var(--surface2)';
+    const intensity = v / maxVal;
+    const l = Math.round(50 - intensity * 30);  // 50% → 20% lightness
+    return `hsl(150, 60%, ${l}%)`;
+  };
+
+  // Build grid: label col + nCols data cols
+  const gridCols = `120px repeat(${nCols}, 22px)`;
+  let html = `<div class="heatmap-grid" style="display:grid;grid-template-columns:${gridCols};gap:1px">`;
+
+  // Header row
+  html += `<div></div>`;
+  colLabels.forEach((lbl, i) => {
+    const show = nCols <= 12 || i % 3 === 0;
+    html += `<div class="heatmap-col-header">${show ? lbl : ''}</div>`;
+  });
+
+  // Data rows
+  species.forEach(s => {
+    const label = s.length > 18 ? s.slice(0, 17) + '…' : s;
+    html += `<div class="heatmap-label" title="${s}">${label}</div>`;
+    data[s].forEach((v, i) => {
+      html += `<div class="heatmap-cell" style="background:${cellToColor(v)}"
+        title="${s} · ${colLabels[i]}: ${v} detection${v !== 1 ? 's' : ''}"></div>`;
+    });
+  });
+
+  html += '</div>';
+  el.innerHTML = html;
 }
 
 function downloadReport(type) {

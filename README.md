@@ -385,7 +385,6 @@ The pipeline will automatically set up the correct audio stream and frequency fi
 - [ ] Insect classifier — grasshoppers and bush crickets via OrthopterOSS (wired and ready, awaiting model release)
 - [x] Soil Acoustic Index (SAI) — beta implementation using ACI + spectral entropy
 - [ ] Species activity heatmaps by time of day and season
-- [ ] Automated weekly detection reports via email
 
 ---
 

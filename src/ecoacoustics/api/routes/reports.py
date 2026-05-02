@@ -2,6 +2,7 @@
 
 import csv
 import io
+from collections import defaultdict
 from datetime import date, timedelta
 from pathlib import Path
 from typing import Optional
@@ -192,6 +193,53 @@ def download_sessions(
         media_type="text/csv",
         headers={"Content-Disposition": f"attachment; filename={filename}"},
     )
+
+
+@router.get("/reports/heatmap")
+def heatmap(
+    date_from: Optional[str] = Query(None),
+    date_to: Optional[str] = Query(None),
+    classifier: Optional[str] = Query(None),
+):
+    """Return detection counts bucketed by hour-of-day and month for heatmap rendering."""
+    det_path, _ = _paths()
+    date_from = date_from or ""
+    date_to = date_to or "9999-99-99"
+
+    # species -> hour (0-23) -> count
+    by_hour: dict[str, list[int]] = defaultdict(lambda: [0] * 24)
+    # species -> month (0-11) -> count
+    by_month: dict[str, list[int]] = defaultdict(lambda: [0] * 12)
+    classifiers_seen: set[str] = set()
+
+    if det_path.exists():
+        with open(det_path) as f:
+            for row in csv.DictReader(f):
+                d = row.get("date", "")
+                if date_from and d < date_from:
+                    continue
+                if d > date_to:
+                    continue
+                clf = row.get("classifier", "")
+                if classifier and clf != classifier:
+                    continue
+                species = row.get("species_common", "").strip()
+                if not species:
+                    continue
+                classifiers_seen.add(clf)
+                t = row.get("time", "00:00:00")
+                hour = int(t.split(":")[0]) if t else 0
+                month = int(d.split("-")[1]) - 1 if d and len(d) >= 7 else 0  # 0-indexed
+                by_hour[species][hour] += 1
+                by_month[species][month] += 1
+
+    return {
+        "by_hour": dict(by_hour),
+        "by_month": dict(by_month),
+        "classifiers": sorted(classifiers_seen),
+        "date_from": date_from or None,
+        "date_to": date_to if date_to != "9999-99-99" else None,
+    }
 
 
 @router.delete("/reports/logs")
