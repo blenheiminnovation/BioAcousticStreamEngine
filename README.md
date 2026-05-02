@@ -460,6 +460,9 @@ BioAcoustic Stream Engine (BASE) has been shaped over several years by the Innov
 | **Harry Hanson** | Ecoacoustics research and development |
 | **Tawhid Shahrior** | Ecoacoustics research and development |
 | **Dr. Matthias Rolf** | Ecoacoustics research and development |
+| **Max Caminow** | Innovation Team &amp; Natural Capital Team |
+| **Dr. Dave Gasca** | Innovation Team &amp; Natural Capital Team |
+| **Arnaud Fontannaz** | Innovation Team &amp; Natural Capital Team |
 
 Their collective contribution — from early prototypes to field testing — is what made this project possible.
 
