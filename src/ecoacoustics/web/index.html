@@ -27,10 +27,70 @@
   <a href="#clips"><span class="icon">🎵</span> Clips</a>
   <a href="#reports"><span class="icon">📊</span> Reports</a>
   <a href="#settings"><span class="icon">⚙</span> Settings</a>
-  <div class="nav-footer">Blenheim Palace<br>Innovation</div>
+  <div class="nav-footer">
+    <div class="nav-footer-name">David Green</div>
+    <div class="nav-footer-org">Blenheim Palace Innovation</div>
+    <button class="btn-about" onclick="showAbout()">About BASE</button>
+  </div>
 </nav>
 
 <main id="main"></main>
+
+<!-- About modal -->
+<div id="about-overlay" onclick="hideAbout()">
+  <div id="about-modal" onclick="event.stopPropagation()">
+    <button class="about-close" onclick="hideAbout()">✕</button>
+
+    <div class="about-header">
+      <div class="about-logo">🌿</div>
+      <div>
+        <h2 class="about-title">BioAcoustic Stream Engine</h2>
+        <div class="about-subtitle">BASE &nbsp;·&nbsp; <span id="about-version">v1.0.0</span></div>
+      </div>
+    </div>
+
+    <p class="about-mission">
+      This project was conceived by the Blenheim Palace Innovation Team, combining our own
+      work with contributions from pre-trained models and open research. We are excited to
+      engage others and to learn together more about our natural world.
+    </p>
+
+    <div class="about-section-title">Created by</div>
+    <p class="about-creator">
+      <strong>David Green</strong> &mdash; Blenheim Palace Innovation Team Lead<br>
+      <span style="font-size:0.8rem;color:var(--muted)">
+        A belief that technology can bring people closer to the natural world — making
+        acoustic biodiversity monitoring open, accessible, and shareable.
+      </span>
+    </p>
+
+    <div class="about-section-title">Innovation Team</div>
+    <div class="about-team">
+      <div class="about-team-member"><strong>Harry Hanson</strong><span>Ecoacoustics research &amp; development</span></div>
+      <div class="about-team-member"><strong>Tawhid Shahrior</strong><span>Ecoacoustics research &amp; development</span></div>
+      <div class="about-team-member"><strong>Dr. Matthias Rolf</strong><span>Ecoacoustics research &amp; development</span></div>
+    </div>
+
+    <div class="about-section-title">Powered by</div>
+    <div class="about-credits">
+      <div class="about-credit-row">🐦 <strong>BirdNET-Analyzer</strong> &mdash; Cornell Lab of Ornithology &amp; TU Chemnitz</div>
+      <div class="about-credit-row">🦇 <strong>BatDetect2</strong> &mdash; University of Edinburgh, Caltech &amp; UCL</div>
+      <div class="about-credit-row">🐝 <strong>BuzzDetect v1.0.1</strong> &mdash; OSU Bee Lab, Ohio State University</div>
+      <div class="about-credit-row">🌱 <strong>Soil Acoustic Index</strong> &mdash; Blenheim Palace Innovation Team</div>
+    </div>
+
+    <div class="about-section-title">Inspiration</div>
+    <p style="font-size:0.82rem;color:var(--muted);margin:0">
+      Inspired by the work and vision of <strong style="color:var(--text)">Dr. Curt Lamberth</strong>,
+      whose research into acoustic biodiversity monitoring provided the founding ideas behind this system.
+    </p>
+
+    <div class="about-footer">
+      <span>MIT Licence &nbsp;·&nbsp; Open Source</span>
+      <a href="https://github.com/blenheiminnovation/smartecoacoustics" target="_blank" class="about-github">GitHub ↗</a>
+    </div>
+  </div>
+</div>
 
 <div id="toast"></div>
 

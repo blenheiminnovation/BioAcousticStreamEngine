@@ -25,14 +25,16 @@ def _paths() -> tuple[Path, Path]:
 
 
 @router.get("/reports/species")
-def list_species():
-    """All unique species in detections.csv for the download filter."""
+def list_species(classifier: Optional[str] = Query(None)):
+    """All unique species in detections.csv, optionally filtered by classifier."""
     det_path, _ = _paths()
     if not det_path.exists():
         return {"species": []}
     species: set[str] = set()
     with open(det_path) as f:
         for row in csv.DictReader(f):
+            if classifier and row.get("classifier", "") != classifier:
+                continue
             s = row.get("species_common", "").strip()
             if s:
                 species.add(s)
@@ -44,6 +46,7 @@ def summary_report(
     date_from: Optional[str] = Query(None),
     date_to: Optional[str] = Query(None),
     species: Optional[str] = Query(None),
+    classifier: Optional[str] = Query(None),
 ):
     det_path, sess_path = _paths()
     date_from = date_from or (date.today() - timedelta(days=7)).strftime("%Y-%m-%d")
@@ -51,26 +54,29 @@ def summary_report(
 
     # When filtering by species, read detections.csv (has species_common per row)
     # Otherwise read sessions.csv for aggregated daily totals
-    if species:
+    if species or classifier:
         by_date: dict[str, dict] = {}
         if det_path.exists():
             with open(det_path) as f:
                 for row in csv.DictReader(f):
-                    if row.get("species_common", "") != species:
+                    if species and row.get("species_common", "") != species:
+                        continue
+                    if classifier and row.get("classifier", "") != classifier:
                         continue
                     d = row.get("date", "")
                     if not (date_from <= d <= date_to):
                         continue
                     if d not in by_date:
-                        by_date[d] = {"date": d, "sessions": set(), "total_calls": 0}
+                        by_date[d] = {"date": d, "sessions": set(), "species": set(), "total_calls": 0}
                     by_date[d]["sessions"].add(row.get("session_id", ""))
+                    by_date[d]["species"].add(row.get("species_common", ""))
                     by_date[d]["total_calls"] += 1
         rows = []
         for d, data in sorted(by_date.items()):
             rows.append({
                 "date": d,
                 "sessions": len(data["sessions"]),
-                "species_count": 1,
+                "species_count": len(data["species"]),
                 "total_calls": data["total_calls"],
             })
     else:
@@ -112,6 +118,7 @@ def download_detections(
     date_from: Optional[str] = Query(None),
     date_to: Optional[str] = Query(None),
     species: Optional[str] = Query(None),
+    classifier: Optional[str] = Query(None),
 ):
     det_path, _ = _paths()
     date_from = date_from or ""
@@ -130,6 +137,8 @@ def download_detections(
                 if d > date_to:
                     continue
                 if species and row.get("species_common", "") != species:
+                    continue
+                if classifier and row.get("classifier", "") != classifier:
                     continue
                 if writer is None:
                     writer = csv.DictWriter(output, fieldnames=reader.fieldnames)

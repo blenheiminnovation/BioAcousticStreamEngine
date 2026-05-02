@@ -582,17 +582,47 @@ async function loadSpeciesList(classifierFilter = 'all') {
   if (!el) return;
   el.innerHTML = '<div class="empty">Loading...</div>';
   try {
-    const url = classifierFilter === 'all' ? '/api/clips' : `/api/clips?classifier=${classifierFilter}`;
-    const data = await api.get(url);
+    const data = await api.get('/api/clips');   // always fetch all; group client-side
     if (!data.species.length) {
-      el.innerHTML = `<div class="empty">No ${classifierFilter === 'all' ? '' : classifierFilter + ' '}clips recorded yet.</div>`;
+      el.innerHTML = '<div class="empty">No clips recorded yet.</div>';
       return;
     }
-    el.innerHTML = data.species.map(s => `
-      <div class="species-item" data-dir="${s.dir}" onclick="loadClips('${s.dir}','${s.name}')">
-        <span>${s.name}</span><span class="count">${s.clip_count}</span>
-      </div>`).join('');
+
+    if (classifierFilter !== 'all') {
+      // Filtered view — flat list for selected type
+      const filtered = data.species.filter(s => s.classifier === classifierFilter);
+      if (!filtered.length) {
+        el.innerHTML = `<div class="empty">No ${classifierFilter} clips recorded yet.</div>`;
+        return;
+      }
+      el.innerHTML = filtered.map(s => speciesItem(s)).join('');
+      return;
+    }
+
+    // All view — group by classifier type with headers
+    const groups = {};
+    CLASSIFIERS.filter(c => c.key !== 'all').forEach(c => { groups[c.key] = []; });
+    data.species.forEach(s => {
+      const key = s.classifier || 'bird';
+      if (!groups[key]) groups[key] = [];
+      groups[key].push(s);
+    });
+
+    let html = '';
+    CLASSIFIERS.filter(c => c.key !== 'all').forEach(c => {
+      const items = groups[c.key] || [];
+      if (!items.length) return;
+      html += `<div class="species-group-header">${c.icon} ${c.label}</div>`;
+      html += items.map(s => speciesItem(s)).join('');
+    });
+    el.innerHTML = html || '<div class="empty">No clips recorded yet.</div>';
   } catch (err) { el.innerHTML = `<div class="empty" style="color:var(--danger)">${err.message}</div>`; }
+}
+
+function speciesItem(s) {
+  return `<div class="species-item" data-dir="${s.dir}" onclick="loadClips('${s.dir}','${s.name}')">
+    <span>${s.name}</span><span class="count">${s.clip_count}</span>
+  </div>`;
 }
 
 function filterClips(key, btn) {
@@ -634,12 +664,9 @@ async function renderReports() {
   const today = new Date().toISOString().slice(0, 10);
   const weekAgo = new Date(Date.now() - 7 * 86400000).toISOString().slice(0, 10);
 
-  // Load species list for filter dropdown
-  let speciesOptions = '<option value="">All species</option>';
-  try {
-    const sp = await api.get('/api/reports/species');
-    speciesOptions += sp.species.map(s => `<option value="${s}">${s}</option>`).join('');
-  } catch (_) {}
+  const typeOptions = CLASSIFIERS.map(c =>
+    `<option value="${c.key}">${c.icon} ${c.label}</option>`
+  ).join('');
 
   document.getElementById('main').innerHTML = `
     <div class="card">
@@ -654,8 +681,12 @@ async function renderReports() {
           <input type="date" id="r-to" value="${today}">
         </div>
         <div class="form-group">
+          <label>Type</label>
+          <select id="r-type">${typeOptions}</select>
+        </div>
+        <div class="form-group">
           <label>Species</label>
-          <select id="r-species" style="min-width:200px">${speciesOptions}</select>
+          <select id="r-species" style="min-width:180px"><option value="">All species</option></select>
         </div>
         <div class="form-group" style="justify-content:flex-end">
           <button class="btn btn-primary" id="btn-load-report">Load Report</button>
@@ -692,19 +723,38 @@ async function renderReports() {
   document.getElementById('btn-dl-detections').addEventListener('click', () => downloadReport('detections'));
   document.getElementById('btn-dl-sessions').addEventListener('click', () => downloadReport('sessions'));
   document.getElementById('btn-clear-logs').addEventListener('click', confirmClearLogs);
+  document.getElementById('r-type').addEventListener('change', refreshReportSpecies);
+
+  // Populate species dropdown for initial "all" selection
+  await refreshReportSpecies();
+}
+
+async function refreshReportSpecies() {
+  const typeEl = document.getElementById('r-type');
+  const speciesEl = document.getElementById('r-species');
+  if (!typeEl || !speciesEl) return;
+  const classifier = typeEl.value === 'all' ? '' : typeEl.value;
+  const url = classifier ? `/api/reports/species?classifier=${classifier}` : '/api/reports/species';
+  try {
+    const data = await api.get(url);
+    speciesEl.innerHTML = '<option value="">All species</option>' +
+      data.species.map(s => `<option value="${s}">${s}</option>`).join('');
+  } catch (_) {}
 }
 
 async function loadReport() {
   const btn = document.getElementById('btn-load-report');
   const from = document.getElementById('r-from').value;
   const to = document.getElementById('r-to').value;
+  const classifier = document.getElementById('r-type')?.value || 'all';
+  const species = document.getElementById('r-species')?.value || '';
   const el = document.getElementById('report-content');
   el.innerHTML = '<div class="empty">Loading...</div>';
   btnLoad(btn, '⟳ Loading...');
-  const species = document.getElementById('r-species')?.value || '';
+  const classifierParam = classifier && classifier !== 'all' ? `&classifier=${classifier}` : '';
   const speciesParam = species ? `&species=${encodeURIComponent(species)}` : '';
   try {
-    const data = await api.get(`/api/reports/summary?date_from=${from}&date_to=${to}${speciesParam}`);
+    const data = await api.get(`/api/reports/summary?date_from=${from}&date_to=${to}${classifierParam}${speciesParam}`);
     const filterLabel = data.species ? ` — ${data.species}` : '';
     if (!data.days.length) { el.innerHTML = `<div class="empty">No data for this period${filterLabel}.</div>`; return; }
     el.innerHTML = `
@@ -728,8 +778,10 @@ async function loadReport() {
 function downloadReport(type) {
   const from = document.getElementById('r-from')?.value || '';
   const to = document.getElementById('r-to')?.value || '';
+  const classifier = document.getElementById('r-type')?.value || 'all';
   const species = document.getElementById('r-species')?.value || '';
   let url = `/api/reports/download/${type}?date_from=${from}&date_to=${to}`;
+  if (classifier && classifier !== 'all') url += `&classifier=${classifier}`;
   if (species) url += `&species=${encodeURIComponent(species)}`;
   const a = document.createElement('a');
   a.href = url; a.download = ''; a.click();
@@ -964,6 +1016,20 @@ async function saveLocation() {
     toast(err.message, 'error', 6000);
   } finally { btnDone(btn); }
 }
+
+/* ── About modal ── */
+function showAbout() {
+  const v = document.getElementById('about-version');
+  const hv = document.getElementById('version');
+  if (v && hv) v.textContent = hv.textContent;
+  document.getElementById('about-overlay').classList.add('show');
+}
+function hideAbout() {
+  document.getElementById('about-overlay').classList.remove('show');
+}
+document.addEventListener('keydown', e => { if (e.key === 'Escape') hideAbout(); });
+window.showAbout = showAbout;
+window.hideAbout = hideAbout;
 
 /* ── Boot ── */
 router.init();

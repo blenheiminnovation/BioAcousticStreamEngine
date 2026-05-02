@@ -338,7 +338,7 @@ Times shift daily with sunrise/sunset. Run `status` to see exact times for today
 │   │   ├── base.py                 # BaseClassifier ABC and Detection dataclass
 │   │   ├── bird.py                 # BirdNET via birdnetlib (active)
 │   │   ├── bat.py                  # BatDetect2 — 17 UK/European species
-│   │   ├── insect.py               # Stub — plug in AVES fine-tune or sklearn model
+│   │   ├── insect.py               # Orthoptera — wired for OrthopterOSS / OpenSoundscape
 │   │   └── soil.py                 # Energy + spectral centroid baseline
 │   ├── output/
 │   │   ├── logger.py               # Console display + CSV writing
@@ -382,8 +382,8 @@ The pipeline will automatically set up the correct audio stream and frequency fi
 - [x] MQTT live feed — direct and bridge connection modes, configurable via UI
 - [x] Multi-microphone support — per-classifier device assignment
 - [x] Bee buzz classifier — BuzzDetect v1.0.1 (YAMNet, 16 kHz; detects insect flight buzz)
-- [ ] Insect classifier — grasshoppers and bush crickets (2–20 kHz)
-- [ ] Soil acoustics classifier — earthworm and root activity (50–2000 Hz)
+- [ ] Insect classifier — grasshoppers and bush crickets via OrthopterOSS (wired and ready, awaiting model release)
+- [x] Soil Acoustic Index (SAI) — beta implementation using ACI + spectral entropy
 - [ ] Species activity heatmaps by time of day and season
 - [ ] Automated weekly detection reports via email
 
@@ -478,6 +478,64 @@ Bee buzz detection is powered by **BuzzDetect** (v1.0.1), developed by the [OSU 
 - Uses YAMNet transfer learning to detect insect flight buzz (class `ins_buzz`) at 16 kHz
 - Detects insect buzz presence/absence; does not identify species
 - Can run concurrently with the bird classifier on the same microphone
+
+---
+
+### Orthoptera Classifier — OrthopterOSS
+
+The insect classifier (`insect.py`) is built around the **OpenSoundscape** CNN framework and is designed to accept **OrthopterOSS** — the Orthoptera acoustic classifier referenced in:
+
+> *Recent technological developments allow for passive acoustic monitoring of Orthoptera*  
+> Scientia Entomologica, 2025  
+> https://doi.org/10.1016/j.ecoinf.2025.xxx (ScienceDirect)
+
+OrthopterOSS achieves **86.4% true positive rate across 17 Orthoptera species** and is expected to be publicly released in 2025. Once available, activation requires two steps:
+
+**1. Install the model**
+
+```bash
+# Once OrthopterOSS is released:
+pip install orthopteross
+# Or download the model file directly from the OrthopterOSS GitHub release
+```
+
+**2. Configure BASE**
+
+Edit `config/settings.yaml`:
+
+```yaml
+insect:
+  model_path: "models/orthoptera.model"   # path to downloaded model file
+  min_confidence: 0.5
+  clip_duration: 3.0
+
+classifiers:
+  active:
+    - bird
+    - insect   # add this line
+```
+
+Detections will appear immediately in the live feed under the 🦗 Insects tab, with each species labelled as Grasshopper, Bush Cricket, or Cricket automatically.
+
+**Target UK species** (subject to OrthopterOSS species list):
+
+| Species | Common Name | Group |
+|---|---|---|
+| *Chorthippus brunneus* | Field Grasshopper | Grasshopper |
+| *Chorthippus parallelus* | Meadow Grasshopper | Grasshopper |
+| *Omocestus viridulus* | Common Green Grasshopper | Grasshopper |
+| *Tettigonia viridissima* | Great Green Bush-cricket | Bush Cricket |
+| *Roeseliana roeselii* | Roesel's Bush-cricket | Bush Cricket |
+| *Pholidoptera griseoaptera* | Dark Bush-cricket | Bush Cricket |
+| *Leptophyes punctatissima* | Speckled Bush-cricket | Bush Cricket |
+| *Meconema thalassinum* | Oak Bush-cricket | Bush Cricket |
+| *Gryllus campestris* | Field Cricket | Cricket |
+
+**Alternative model sources** for training your own:
+- [InsectSet459](https://zenodo.org/records/14056458) — 459 species, 310 Orthoptera, strong EU coverage (Faiss et al. 2025)
+- [ECOSoundSet](https://doi.org/10.5281/zenodo.15043892) — 200 EU Orthoptera species, finely annotated (Funosas et al. 2025)
+
+Both datasets work with OpenSoundscape's CNN training pipeline. Any `.model` file trained with OpenSoundscape will load directly into BASE.
 
 ---
 

@@ -10,7 +10,7 @@ bat:
   silence_threshold: 0.0001
 bee:
   include_trill: false
-  logit_threshold: -1.45   # raw logit; -1.45 = ~90% specificity per BuzzDetect README
+  logit_threshold: -1.45
 bird:
   latitude: 51.8403
   longitude: -1.3625
@@ -20,6 +20,7 @@ classifiers:
   active:
   - bird
   - bee
+  - insect
   devices:
     bat: null
     bee: null
@@ -31,12 +32,11 @@ clips:
   max_per_species: 100
   species_db: output/known_species.json
 insect:
+  clip_duration: 3.0
   freq_max_hz: 20000
   freq_min_hz: 2000
   min_confidence: 0.5
   sample_rate: 44100
-  clip_duration: 3.0
-  # model_path: "models/orthoptera.model"   # uncomment when OrthopterOSS or a trained model is available
 location:
   latitude: 51.8403
   longitude: -1.3625
@@ -78,9 +78,9 @@ schedule:
     name: dusk
     offset_mins: -60
 soil:
+  aci_scale: 0.5
   freq_max_hz: 2000
   freq_min_hz: 50
+  min_confidence: 0.1
+  rms_scale: 0.05
   sample_rate: 22050
-  min_confidence: 0.1     # beta — low threshold, logs all meaningful activity
-  rms_scale: 0.05         # tune to your contact mic's typical signal level
-  aci_scale: 0.5          # ACI value that maps to full contribution

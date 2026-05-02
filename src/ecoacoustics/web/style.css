@@ -81,7 +81,7 @@ nav a {
 nav a:hover { background: var(--surface2); color: var(--text); }
 nav a.active { background: var(--surface2); color: var(--primary); font-weight: 600; }
 nav a .icon { font-size: 1rem; width: 20px; text-align: center; }
-nav .nav-footer { margin-top: auto; padding: 8px 12px; font-size: 0.72rem; color: var(--muted); line-height: 1.4; }
+nav .nav-footer { margin-top: auto; }
 
 /* ── Main content ── */
 main {
@@ -196,6 +196,12 @@ tr:hover td { background: var(--surface2); }
 .species-item:hover { background: var(--surface2); }
 .species-item.active { background: var(--surface2); color: var(--primary); font-weight: 600; }
 .species-item .count { font-size: 0.72rem; color: var(--muted); font-family: var(--mono); }
+.species-group-header {
+  font-size: 0.68rem; font-weight: 700; text-transform: uppercase;
+  letter-spacing: 0.7px; color: var(--primary); padding: 10px 8px 4px;
+  margin-top: 4px;
+}
+.species-group-header:first-child { margin-top: 0; padding-top: 2px; }
 .clips-grid { display: flex; flex-direction: column; gap: 8px; max-height: 520px; overflow-y: auto; }
 .clip-row {
   display: flex; align-items: center; gap: 12px;
@@ -338,6 +344,75 @@ tr:hover td { background: var(--surface2); }
   border-radius: var(--radius); color: var(--text); font-size: 0.78rem;
   font-family: var(--font);
 }
+
+/* ── Nav footer ── */
+.nav-footer { margin-top: auto; padding: 12px; border-top: 1px solid var(--border); }
+.nav-footer-name { font-size: 0.82rem; font-weight: 600; color: var(--text); }
+.nav-footer-org { font-size: 0.72rem; color: var(--muted); margin-bottom: 8px; }
+.btn-about {
+  width: 100%; padding: 6px 10px; background: var(--surface2);
+  border: 1px solid var(--border); border-radius: var(--radius);
+  color: var(--muted); font-size: 0.75rem; cursor: pointer;
+  font-family: var(--font); transition: color 0.15s, border-color 0.15s;
+}
+.btn-about:hover { color: var(--primary); border-color: var(--primary); }
+
+/* ── About modal ── */
+#about-overlay {
+  display: none; position: fixed; inset: 0;
+  background: rgba(0,0,0,0.6); z-index: 200;
+  align-items: center; justify-content: center;
+}
+#about-overlay.show { display: flex; }
+#about-modal {
+  background: var(--surface); border: 1px solid var(--border);
+  border-radius: 12px; padding: 28px; max-width: 520px; width: 90%;
+  max-height: 85vh; overflow-y: auto; position: relative;
+}
+.about-close {
+  position: absolute; top: 14px; right: 16px;
+  background: none; border: none; color: var(--muted);
+  font-size: 1rem; cursor: pointer; padding: 4px 8px;
+  border-radius: var(--radius); transition: color 0.15s;
+}
+.about-close:hover { color: var(--text); }
+.about-header { display: flex; align-items: center; gap: 14px; margin-bottom: 16px; }
+.about-logo { font-size: 2.2rem; }
+.about-title { font-size: 1.2rem; font-weight: 700; color: var(--primary); margin: 0; }
+.about-subtitle { font-size: 0.78rem; color: var(--muted); font-family: var(--mono); margin-top: 2px; }
+.about-mission {
+  font-size: 0.85rem; color: var(--text); line-height: 1.6;
+  border-left: 3px solid var(--primary); padding-left: 12px;
+  margin: 0 0 18px;
+}
+.about-section-title {
+  font-size: 0.68rem; font-weight: 700; text-transform: uppercase;
+  letter-spacing: 0.8px; color: var(--muted); margin: 16px 0 8px;
+}
+.about-creator { font-size: 0.85rem; color: var(--text); line-height: 1.6; margin: 0; }
+.about-team { display: flex; flex-direction: column; gap: 6px; }
+.about-team-member {
+  display: flex; justify-content: space-between; align-items: baseline;
+  font-size: 0.82rem; padding: 6px 10px;
+  background: var(--surface2); border-radius: var(--radius);
+}
+.about-team-member strong { color: var(--text); }
+.about-team-member span { color: var(--muted); font-size: 0.75rem; }
+.about-credits { display: flex; flex-direction: column; gap: 5px; }
+.about-credit-row {
+  font-size: 0.82rem; color: var(--muted); padding: 5px 10px;
+  background: var(--surface2); border-radius: var(--radius);
+}
+.about-credit-row strong { color: var(--text); }
+.about-footer {
+  display: flex; justify-content: space-between; align-items: center;
+  margin-top: 20px; padding-top: 14px; border-top: 1px solid var(--border);
+  font-size: 0.75rem; color: var(--muted);
+}
+.about-github {
+  color: var(--primary); text-decoration: none; font-size: 0.78rem;
+}
+.about-github:hover { text-decoration: underline; }
 
 /* ── Scrollbar ── */
 ::-webkit-scrollbar { width: 5px; }
