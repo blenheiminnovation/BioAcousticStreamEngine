@@ -76,8 +76,9 @@ schedule:
     name: dusk
     offset_mins: -60
 soil:
-  energy_threshold: 0.01
   freq_max_hz: 2000
   freq_min_hz: 50
-  min_confidence: 0.4
   sample_rate: 22050
+  min_confidence: 0.1     # beta — low threshold, logs all meaningful activity
+  rms_scale: 0.05         # tune to your contact mic's typical signal level
+  aci_scale: 0.5          # ACI value that maps to full contribution

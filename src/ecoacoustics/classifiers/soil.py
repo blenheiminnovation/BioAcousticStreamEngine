@@ -1,32 +1,55 @@
 """
-Soil acoustics classifier — detects subsurface biological activity.
+Soil acoustics classifier — Soil Acoustic Index (SAI).
 
-Soil hosts a rich acoustic environment produced by earthworms, nematodes,
-fungal mycelium, root growth, and soil arthropods, all generating low-
-frequency vibrations in the 50–2000 Hz band.
+Based on early soil ecoacoustics work by the Blenheim Palace Innovation Team.
+The pipeline applies a bandpass filter (50–2000 Hz) via AudioProcessor before
+this classifier is called, replicating the cleaning step from bandpassFilter.py.
+What remains is used to compute the SAI.
 
-This is an emerging research area without large public labelled datasets,
-so the current implementation uses a feature-based energy detector rather
-than a trained neural network.  It flags anomalous acoustic events for
-human review rather than identifying species directly.
+Soil Acoustic Index (SAI)
+--------------------------
+A composite 0–1 index derived from three acoustic measures:
 
-Default implementation:
-  RMS energy above a configurable threshold triggers a detection.
-  The pseudo-confidence score is derived from the energy level.
-  The spectral centroid is also computed and stored in metadata to help
-  distinguish biological events from mechanical noise (e.g. digging).
+  RMS energy         Signal power after cleaning. Scales with intensity of
+                     activity (worm movement, root growth, soil arthropods).
 
-Hardware note:
-  A contact microphone or geophone placed in or on the soil surface
-  captures significantly better signal than an air microphone pointing
-  downward.  Geophones (e.g. SM-24) are particularly effective.
+  Acoustic Complexity Index (ACI)
+                     Measures temporal variation in spectral intensity across
+                     frequency bins. Biological signals (worms, roots) produce
+                     complex, irregular patterns — high ACI. Mechanical
+                     interference (vibration, rain) produces regular, repeating
+                     patterns — low ACI.
 
-Upgrade path:
-  - Collect labelled recordings from the estate soil.
-  - Train a spectrogram CNN using pyts or cesium for feature extraction.
-  - Contact Rothamsted Research (UK) for published soil bioacoustic datasets.
+  Spectral entropy   Biological broadband activity spreads energy across
+                     many frequencies (high entropy). Tonal mechanical noise
+                     concentrates energy (low entropy).
+
+SAI = 0.4 × rms_norm + 0.4 × aci_norm + 0.2 × entropy
+
+Detections fire when SAI exceeds min_confidence (default 0.1 — intentionally
+low so the index is always reported for analysis during the beta phase).
+
+Activity levels:
+  SAI ≥ 0.65  →  High Soil Activity
+  SAI ≥ 0.35  →  Moderate Soil Activity
+  SAI < 0.35  →  Low Soil Activity
+
+Hardware
+--------
+A contact microphone (geophone, SM-24, or piezo disk pressed to the soil
+surface) gives significantly better sensitivity than an air microphone.
+The frequency range and SAI calibration constants may need tuning per device.
+
+Beta note
+---------
+SAI thresholds and weighting are uncalibrated — based on signal processing
+principles rather than labelled Blenheim soil recordings. Treat all outputs
+as indicative and useful for relative comparison across time. Absolute
+values should not be compared across different microphones or locations
+without recalibration.
 
 Author: David Green, Blenheim Palace
+Acoustic indices after: Pieretti et al. (2011), Pijanowski et al. (2011)
 """
 
 from typing import Any
@@ -38,11 +61,10 @@ from ecoacoustics.classifiers.base import BaseClassifier, Detection
 
 
 class SoilClassifier(BaseClassifier):
-    """Energy-based soil activity detector in the 50–2000 Hz band.
+    """Soil Acoustic Index (SAI) classifier.
 
-    Returns a 'soil_activity' detection when RMS energy exceeds the
-    configured threshold, with confidence derived from signal strength
-    and spectral centroid stored in metadata for post-hoc analysis.
+    Computes a composite index from RMS energy, Acoustic Complexity Index,
+    and spectral entropy on bandpass-cleaned (50–2000 Hz) audio chunks.
     """
 
     name = "soil"
@@ -51,71 +73,124 @@ class SoilClassifier(BaseClassifier):
         """
         Args:
             config: Section from settings.yaml under the 'soil' key.
-                min_confidence: Minimum score to report a detection (default 0.4).
-                energy_threshold: RMS level below which audio is treated as
-                    background; tune to your microphone and environment.
+
+            min_confidence  Minimum SAI to report a detection. Default 0.1
+                            (very low — beta mode logs all meaningful activity).
+            rms_scale       RMS value that maps to a full (1.0) RMS contribution.
+                            Tune to your microphone's typical signal level.
+            aci_scale       ACI value that maps to a full (1.0) ACI contribution.
         """
-        self._min_confidence: float = config.get("min_confidence", 0.4)
-        # RMS energy threshold — tune for your microphone/environment
-        self._energy_threshold: float = config.get("energy_threshold", 0.01)
+        self._min_confidence: float = config.get("min_confidence", 0.1)
+        self._rms_scale: float = config.get("rms_scale", 0.05)
+        self._aci_scale: float = config.get("aci_scale", 0.5)
 
     @property
     def sample_rate(self) -> int:
-        """22.05 kHz is more than sufficient for the 50–2000 Hz band."""
         return 22050
 
     @property
     def freq_min_hz(self) -> int:
-        """Lower edge of the soil-acoustics bandpass filter."""
         return 50
 
     @property
     def freq_max_hz(self) -> int:
-        """Upper edge of the soil-acoustics bandpass filter."""
-        return 2_000
+        return 2000
 
     def load(self) -> None:
-        """No model weights required for the baseline energy detector."""
         pass
 
     def classify(self, chunk: AudioChunk) -> list[Detection]:
-        """Detect anomalous soil acoustic activity via RMS energy.
+        """Compute SAI from bandpass-cleaned audio and return a Detection.
 
         Args:
-            chunk: Pre-processed audio at 22.05 kHz, bandpass 50–2000 Hz.
+            chunk: Pre-processed audio at 22.05 kHz, bandpass-filtered 50–2000 Hz.
 
         Returns:
-            A single 'soil_activity' Detection if energy exceeds threshold,
-            otherwise an empty list.
+            A single Detection whose confidence IS the SAI (0–1), or empty list
+            if SAI is below min_confidence.
         """
-        rms = float(np.sqrt(np.mean(chunk.data ** 2)))
-        if rms < self._energy_threshold:
+        audio = chunk.data.astype(np.float64)
+        if len(audio) == 0:
             return []
 
-        # Map RMS to a 0.4–1.0 pseudo-confidence range for downstream filtering
-        confidence = min(1.0, 0.4 + rms / (self._energy_threshold * 10))
-        if confidence < self._min_confidence:
+        rms = float(np.sqrt(np.mean(audio ** 2)))
+        aci = self._acoustic_complexity_index(audio)
+        entropy = self._spectral_entropy(audio)
+
+        rms_norm = min(rms / max(self._rms_scale, 1e-10), 1.0)
+        aci_norm = min(aci / max(self._aci_scale, 1e-10), 1.0)
+
+        sai = round(0.4 * rms_norm + 0.4 * aci_norm + 0.2 * entropy, 4)
+
+        if sai < self._min_confidence:
             return []
 
-        spectral_centroid = self._spectral_centroid(chunk.data, chunk.sample_rate)
-        return [
-            Detection(
-                label="soil_activity",
-                confidence=confidence,
-                classifier=self.name,
-                timestamp=chunk.timestamp,
-                metadata={
-                    "rms_energy": rms,
-                    "spectral_centroid_hz": spectral_centroid,
-                },
-            )
-        ]
+        if sai >= 0.65:
+            level = "High"
+        elif sai >= 0.35:
+            level = "Moderate"
+        else:
+            level = "Low"
+
+        return [Detection(
+            label=f"Soil Activity — {level}",
+            confidence=sai,
+            classifier=self.name,
+            timestamp=chunk.timestamp,
+            metadata={
+                "sai": sai,
+                "activity_level": level,
+                "rms_energy": round(rms, 6),
+                "aci": round(aci, 4),
+                "spectral_entropy": round(entropy, 4),
+                "beta": True,
+            },
+        )]
 
     @staticmethod
-    def _spectral_centroid(audio: np.ndarray, sr: int) -> float:
-        """Compute the power-weighted mean frequency (Hz) of the audio spectrum."""
-        spectrum = np.abs(np.fft.rfft(audio))
-        freqs = np.fft.rfftfreq(len(audio), 1.0 / sr)
-        if spectrum.sum() == 0:
+    def _acoustic_complexity_index(audio: np.ndarray, n_fft: int = 512, hop: int = 256) -> float:
+        """Compute the Acoustic Complexity Index (ACI) after Pieretti et al. 2011.
+
+        ACI measures temporal variation in spectral intensity. Biological
+        sounds produce irregular, complex patterns (high ACI); mechanical
+        interference produces regular, repeating patterns (low ACI).
+
+        Returns a value typically in the range 0–2; normalised by the caller.
+        """
+        if len(audio) < n_fft:
             return 0.0
-        return float(np.dot(freqs, spectrum) / spectrum.sum())
+
+        n_frames = (len(audio) - n_fft) // hop + 1
+        if n_frames < 2:
+            return 0.0
+
+        # Build power spectrogram frame-by-frame
+        spectrogram = np.array([
+            np.abs(np.fft.rfft(audio[i * hop: i * hop + n_fft]))
+            for i in range(n_frames)
+        ])  # shape: (n_frames, n_bins)
+
+        # ACI per frequency bin: sum|diff| / sum
+        diffs = np.abs(np.diff(spectrogram, axis=0))        # (n_frames-1, n_bins)
+        sums  = spectrogram[:-1].sum(axis=0) + 1e-10        # (n_bins,)
+
+        aci_per_bin = diffs.sum(axis=0) / sums              # (n_bins,)
+        return float(aci_per_bin.mean())
+
+    @staticmethod
+    def _spectral_entropy(audio: np.ndarray) -> float:
+        """Spectral entropy: 0 = tonal/mechanical, 1 = broadband/complex.
+
+        Biological soil activity spreads energy broadly across frequencies,
+        giving high entropy. Tonal mechanical noise concentrates energy,
+        giving low entropy.
+        """
+        spectrum = np.abs(np.fft.rfft(audio)) ** 2
+        total = spectrum.sum()
+        if total == 0:
+            return 0.0
+        p = spectrum / total
+        # Shannon entropy, normalised by log2(n_bins)
+        entropy = -np.sum(p * np.log2(p + 1e-12))
+        max_entropy = np.log2(len(p))
+        return float(entropy / max_entropy) if max_entropy > 0 else 0.0
