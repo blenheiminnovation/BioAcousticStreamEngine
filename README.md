@@ -381,6 +381,7 @@ The pipeline will automatically set up the correct audio stream and frequency fi
 - [x] Web dashboard — live detections, schedule management, audio clips, reports, settings
 - [x] MQTT live feed — direct and bridge connection modes, configurable via UI
 - [x] Multi-microphone support — per-classifier device assignment
+- [x] Bee buzz classifier — BuzzDetect v1.0.1 (YAMNet, 16 kHz; detects insect flight buzz)
 - [ ] Insect classifier — grasshoppers and bush crickets (2–20 kHz)
 - [ ] Soil acoustics classifier — earthworm and root activity (50–2000 Hz)
 - [ ] Species activity heatmaps by time of day and season
@@ -459,6 +460,22 @@ BioAcoustic Stream Engine (BASE) has been shaped over several years by the Innov
 | **Dr. Matthias Rolf** | Ecoacoustics research and development |
 
 Their collective contribution — from early prototypes to field testing — is what made this project possible.
+
+---
+
+### BuzzDetect
+
+Bee buzz detection is powered by **BuzzDetect** (v1.0.1), developed by the [OSU Bee Lab](https://github.com/OSU-Bee-Lab) at Ohio State University.
+
+> Hearon, L. et al. (2025).  
+> **buzzdetect: An open-source tool for passive acoustic monitoring of pollinator activity.**  
+> *Journal of Insect Science*, 25(6), ieaf104.  
+> https://doi.org/10.1093/jisesa/ieaf104
+
+- GitHub: [github.com/OSU-Bee-Lab/buzzdetect](https://github.com/OSU-Bee-Lab/buzzdetect)
+- Uses YAMNet transfer learning to detect insect flight buzz (class `ins_buzz`) at 16 kHz
+- Detects insect buzz presence/absence; does not identify species
+- Can run concurrently with the bird classifier on the same microphone
 
 ---
 

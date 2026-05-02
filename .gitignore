@@ -1,5 +1,6 @@
 .venv/
 __pycache__/
+external/
 config/secrets.yaml
 *.py[cod]
 *.egg-info/

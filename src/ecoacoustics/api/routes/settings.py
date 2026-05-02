@@ -23,7 +23,7 @@ def _save_secrets(data: dict) -> None:
     with open(_SECRETS, "w") as f:
         yaml.dump(data, f, default_flow_style=False, allow_unicode=True)
 
-_CLASSIFIERS = ["bird", "bat", "insect", "soil"]
+_CLASSIFIERS = ["bird", "bat", "bee", "insect", "soil"]
 
 
 class LocationModel(BaseModel):

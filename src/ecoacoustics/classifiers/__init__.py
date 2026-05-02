@@ -11,13 +11,15 @@ Author: David Green, Blenheim Palace
 from ecoacoustics.classifiers.base import BaseClassifier, Detection
 from ecoacoustics.classifiers.bird import BirdClassifier
 from ecoacoustics.classifiers.bat import BatClassifier
+from ecoacoustics.classifiers.bee import BeeClassifier
 from ecoacoustics.classifiers.insect import InsectClassifier
 from ecoacoustics.classifiers.soil import SoilClassifier
 
 REGISTRY: dict[str, type[BaseClassifier]] = {
     "bird": BirdClassifier,
     "bat": BatClassifier,
-    "insect": InsectClassifier,
+    "bee": BeeClassifier,
+    "insect": InsectClassifier,    # stub — grasshoppers, bush crickets (2–20 kHz)
     "soil": SoilClassifier,
 }
 
@@ -26,6 +28,7 @@ __all__ = [
     "Detection",
     "BirdClassifier",
     "BatClassifier",
+    "BeeClassifier",
     "InsectClassifier",
     "SoilClassifier",
     "REGISTRY",

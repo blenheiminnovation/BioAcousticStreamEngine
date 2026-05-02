@@ -7,6 +7,7 @@ const CLASSIFIERS = [
   { key: 'all',    label: 'All',      icon: '◈' },
   { key: 'bird',   label: 'Birds',    icon: '🐦' },
   { key: 'bat',    label: 'Bats',     icon: '🦇' },
+  { key: 'bee',    label: 'Bees',     icon: '🐝' },
   { key: 'insect', label: 'Insects',  icon: '🦗' },
   { key: 'soil',   label: 'Soil',     icon: '🌱' },
 ];
@@ -436,7 +437,8 @@ async function renderSchedule() {
 const _CLF_META = {
   bird:   { icon: '🐦', label: 'Birds',    note: 'Standard microphone (48kHz)' },
   bat:    { icon: '🦇', label: 'Bats',     note: 'Requires ultrasonic mic (≥192kHz)' },
-  insect: { icon: '🦗', label: 'Insects',  note: 'Standard microphone (44.1kHz)' },
+  bee:    { icon: '🐝', label: 'Bees',     note: 'Standard microphone (16kHz) — BuzzDetect v1.0.1' },
+  insect: { icon: '🦗', label: 'Insects',  note: 'Standard microphone (44.1kHz) — grasshoppers, bush crickets' },
   soil:   { icon: '🌱', label: 'Soil',     note: 'Surface / contact microphone (22kHz)' },
 };
 
@@ -457,7 +459,7 @@ async function loadClassifierDevices() {
       return none + opts;
     };
 
-    panel.innerHTML = ['bird', 'bat', 'insect', 'soil'].map(key => {
+    panel.innerHTML = ['bird', 'bat', 'bee', 'insect', 'soil'].map(key => {
       const meta = _CLF_META[key];
       const isActive = clfData.active.includes(key);
       const assignedDevice = clfData.devices[key];
@@ -488,11 +490,11 @@ async function loadClassifierDevices() {
 async function saveClassifiers() {
   const btn = document.getElementById('btn-save-classifiers');
   btnLoad(btn, '⟳ Saving...');
-  const active = ['bird', 'bat', 'insect', 'soil'].filter(k =>
+  const active = ['bird', 'bat', 'bee', 'insect', 'soil'].filter(k =>
     document.getElementById(`clf-active-${k}`)?.checked
   );
   const devices = {};
-  for (const key of ['bird', 'bat', 'insect', 'soil']) {
+  for (const key of ['bird', 'bat', 'bee', 'insect', 'soil']) {
     const val = document.getElementById(`clf-device-${key}`)?.value;
     devices[key] = val === '' ? null : (isNaN(parseInt(val)) ? val : parseInt(val));
   }

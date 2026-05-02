@@ -8,6 +8,9 @@ bat:
   min_class_confidence: 0.4
   min_det_confidence: 0.5
   silence_threshold: 0.0001
+bee:
+  include_trill: false
+  logit_threshold: -1.45   # raw logit; -1.45 = ~90% specificity per BuzzDetect README
 bird:
   latitude: 51.8403
   longitude: -1.3625
@@ -16,6 +19,13 @@ bird:
 classifiers:
   active:
   - bird
+  - bee
+  devices:
+    bat: null
+    bee: null
+    bird: null
+    insect: null
+    soil: null
 clips:
   dir: output/clips
   max_per_species: 100
