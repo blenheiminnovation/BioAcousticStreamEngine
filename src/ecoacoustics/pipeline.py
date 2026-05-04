@@ -90,8 +90,9 @@ class Pipeline:
                 tls=mqtt_cfg.get("tls", False),
                 username=mqtt_cfg.get("username"),
                 password=mqtt_cfg.get("password"),
-                latitude=bird_cfg.get("latitude"),
-                longitude=bird_cfg.get("longitude"),
+                latitude=loc_cfg.get("latitude", bird_cfg.get("latitude")),
+                longitude=loc_cfg.get("longitude", bird_cfg.get("longitude")),
+                location_name=loc_cfg.get("name", ""),
             )
 
         self._logger = DetectionLogger(

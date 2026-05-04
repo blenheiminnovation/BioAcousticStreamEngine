@@ -56,10 +56,12 @@ class MqttPublisher:
         password: str | None = None,
         latitude: float | None = None,
         longitude: float | None = None,
+        location_name: str | None = None,
     ):
         self._prefix = topic_prefix.rstrip("/")
         self._lat = latitude
         self._lon = longitude
+        self._location_name = location_name or ""
 
         self._client = mqtt.Client(mqtt.CallbackAPIVersion.VERSION2)
         self._client.on_connect = self._on_connect
@@ -89,6 +91,7 @@ class MqttPublisher:
             "species_scientific": det.metadata.get("scientific_name", ""),
             "confidence": round(det.confidence, 4),
             "call_number_in_session": call_n,
+            "location_name": self._location_name,
             "latitude": self._lat,
             "longitude": self._lon,
         }
@@ -102,7 +105,7 @@ class MqttPublisher:
         self._client.disconnect()
 
     def _on_connect(self, client, userdata, flags, reason_code, properties) -> None:
-        if reason_code == 0:
+        if str(reason_code) == "Success" or getattr(reason_code, "value", reason_code) == 0:
             _log.info("MQTT: connected")
         else:
             _log.warning("MQTT: connection refused (reason %s)", reason_code)
