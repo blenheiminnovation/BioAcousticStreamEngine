@@ -391,6 +391,13 @@ function prependDetection(det) {
 
 function confClass(c) { return c >= 0.75 ? 'conf-high' : c >= 0.5 ? 'conf-mid' : 'conf-low'; }
 
+function ukDate(iso) {
+  // Convert YYYY-MM-DD → DD/MM/YYYY
+  if (!iso || iso.length < 10) return iso || '';
+  const [y, m, d] = iso.split('-');
+  return `${d}/${m}/${y}`;
+}
+
 function detectionCard(det) {
   const pct = Math.round(det.confidence * 100);
   const classifierInfo = CLASSIFIERS.find(c => c.key === det.classifier);
@@ -662,7 +669,7 @@ async function loadClips(dir, name) {
     if (!data.clips.length) { grid.innerHTML = '<div class="empty">No clips for this species.</div>'; return; }
     grid.innerHTML = data.clips.map(c => `
       <div class="clip-row">
-        <div class="clip-meta">${c.date} ${c.time}<br><span class="conf ${confClass(c.confidence)}">${Math.round(c.confidence * 100)}% conf</span></div>
+        <div class="clip-meta">${ukDate(c.date)} ${c.time}<br><span class="conf ${confClass(c.confidence)}">${Math.round(c.confidence * 100)}% conf</span></div>
         <audio controls src="${c.url}" preload="none"></audio>
         <button class="btn btn-sm btn-danger" onclick="deleteClip('${dir}','${c.filename}',this)">✕</button>
       </div>`).join('');
@@ -801,7 +808,7 @@ async function loadReport() {
       <table>
         <thead><tr><th>Date</th><th>Sessions</th>${data.species ? '' : '<th>Species</th>'}<th>Total Calls</th></tr></thead>
         <tbody>${data.days.map(d => `
-          <tr><td class="window-time">${d.date}</td><td>${d.sessions}</td>${data.species ? '' : `<td>${d.species_count}</td>`}<td>${d.total_calls}</td></tr>`).join('')}
+          <tr><td class="window-time">${ukDate(d.date)}</td><td>${d.sessions}</td>${data.species ? '' : `<td>${d.species_count}</td>`}<td>${d.total_calls}</td></tr>`).join('')}
         </tbody>
       </table>`;
     // Load heatmaps in parallel
