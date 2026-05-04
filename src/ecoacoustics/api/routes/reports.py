@@ -92,7 +92,10 @@ def summary_report(
                         by_date[d] = {"date": d, "sessions": 0, "species_set": set(), "total_calls": 0}
                     by_date[d]["sessions"] += 1
                     by_date[d]["species_set"].add(row.get("species", ""))
-                    by_date[d]["total_calls"] += int(row.get("total_calls", 0))
+                    try:
+                        by_date[d]["total_calls"] += int(row.get("total_calls", 0))
+                    except (ValueError, TypeError):
+                        pass
         rows = []
         for d, data in sorted(by_date.items()):
             rows.append({
