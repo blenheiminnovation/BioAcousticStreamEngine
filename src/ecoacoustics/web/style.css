@@ -345,6 +345,38 @@ tr:hover td { background: var(--surface2); }
   font-family: var(--font);
 }
 
+/* ── Help icon ── */
+.help-icon {
+  display:inline-flex; align-items:center; justify-content:center;
+  width:16px; height:16px; border-radius:50%;
+  background:var(--surface2); border:1px solid var(--border);
+  color:var(--muted); font-size:0.65rem; font-weight:700;
+  cursor:pointer; margin-left:6px; flex-shrink:0;
+  transition:background 0.15s, color 0.15s;
+  vertical-align:middle;
+}
+.help-icon:hover { background:var(--primary); color:#0d1a10; border-color:var(--primary); }
+
+/* ── Help modal ── */
+#help-overlay {
+  display:none; position:fixed; inset:0;
+  background:rgba(0,0,0,0.5); z-index:300;
+  align-items:center; justify-content:center;
+}
+#help-overlay.show { display:flex; }
+#help-modal {
+  background:var(--surface); border:1px solid var(--border);
+  border-radius:12px; padding:28px; max-width:480px; width:90%;
+  max-height:80vh; overflow-y:auto; position:relative;
+}
+.help-icon-large {
+  width:36px; height:36px; border-radius:50%;
+  background:var(--primary); color:#0d1a10;
+  font-size:1.1rem; font-weight:700;
+  display:flex; align-items:center; justify-content:center;
+  margin-bottom:12px;
+}
+
 /* ── Nav footer ── */
 .nav-footer { margin-top: auto; padding: 12px; border-top: 1px solid var(--border); }
 .nav-footer-name { font-size: 0.82rem; font-weight: 600; color: var(--text); }
@@ -448,6 +480,38 @@ tr:hover td { background: var(--surface2); }
   border:1px solid var(--border);
 }
 .heatmap-empty { font-size:0.85rem; color:var(--muted); padding:20px 0; }
+
+/* ── Spectrogram ── */
+.spec-panel {
+  background: #000; border-radius: var(--radius);
+  overflow: hidden; display: none; margin-top: 12px;
+  border: 1px solid var(--border);
+}
+.spec-panel.show { display: block; }
+.spec-toolbar {
+  display: flex; align-items: center; gap: 10px;
+  padding: 8px 12px; background: var(--surface2);
+  border-bottom: 1px solid var(--border);
+}
+.spec-toolbar select {
+  flex: 1; padding: 4px 8px; background: var(--surface);
+  border: 1px solid var(--border); border-radius: var(--radius);
+  color: var(--text); font-size: 0.78rem; font-family: var(--font);
+}
+.spec-toolbar label {
+  font-size: 0.75rem; color: var(--muted); white-space: nowrap;
+  display: flex; align-items: center; gap: 5px;
+}
+.spec-wrap { position: relative; }
+.spec-freq-axis {
+  position: absolute; left: 0; top: 0; bottom: 0;
+  width: 36px; display: flex; flex-direction: column;
+  justify-content: space-between; padding: 2px 4px 2px 2px;
+  font-size: 0.6rem; color: rgba(255,255,255,0.4);
+  font-family: var(--mono); pointer-events: none;
+  background: linear-gradient(to right, rgba(0,0,0,0.7), transparent);
+}
+#spec-canvas { display: block; width: 100%; height: 220px; }
 
 /* ── Scrollbar ── */
 ::-webkit-scrollbar { width: 5px; }

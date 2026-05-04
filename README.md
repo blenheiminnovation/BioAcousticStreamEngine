@@ -88,6 +88,59 @@ A browser tab opens automatically at `http://localhost:8000`. A desktop launcher
 
 ---
 
+## Running 24/7 (Continuous Monitoring)
+
+BASE is designed to run unattended around the clock. Follow these steps to keep it running reliably.
+
+### 1. Enable autostart (already configured)
+
+The web UI and pipeline autostart on login via a systemd user service. Verify it is enabled:
+
+```bash
+systemctl --user status bioacoustic-stream-engine
+```
+
+### 2. Enable linger — keep the service alive when logged out
+
+By default, user services stop when you log out of the desktop. Enable linger so BASE keeps running regardless:
+
+```bash
+loginctl enable-linger $USER
+```
+
+### 3. Prevent the system from sleeping
+
+```bash
+# Stop the OS from suspending automatically
+sudo systemctl mask sleep.target suspend.target hibernate.target hybrid-sleep.target
+
+# Prevent screen blanking (useful if monitoring the spectrogram)
+gsettings set org.gnome.settings-daemon.plugins.power sleep-inactive-ac-timeout 0
+gsettings set org.gnome.desktop.session idle-delay 0
+```
+
+### 4. Prevent lid close from suspending (laptops)
+
+```bash
+sudo sed -i 's/#HandleLidSwitch=suspend/HandleLidSwitch=ignore/' /etc/systemd/logind.conf
+sudo sed -i 's/#HandleLidSwitchExternalPower=suspend/HandleLidSwitchExternalPower=ignore/' /etc/systemd/logind.conf
+sudo systemctl restart systemd-logind
+```
+
+### 5. Keep it plugged in
+
+Battery depletion will stop recording. If running on a laptop, connect AC power and set the power button action to **Do Nothing** in system settings.
+
+### Verify end-to-end
+
+After applying the above, reboot and confirm BASE is running without logging in:
+
+```bash
+systemctl --user is-active bioacoustic-stream-engine   # should print: active
+```
+
+---
+
 ## Commands
 
 | Command | Description |

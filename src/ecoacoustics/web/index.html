@@ -28,13 +28,22 @@
   <a href="#reports"><span class="icon">📊</span> Reports</a>
   <a href="#settings"><span class="icon">⚙</span> Settings</a>
   <div class="nav-footer">
-    <div class="nav-footer-name">David Green</div>
-    <div class="nav-footer-org">Blenheim Palace Innovation</div>
+    <div class="nav-footer-name">Blenheim Innovation</div>
     <button class="btn-about" onclick="showAbout()">About BASE</button>
   </div>
 </nav>
 
 <main id="main"></main>
+
+<!-- Help modal -->
+<div id="help-overlay" onclick="hideHelp()">
+  <div id="help-modal" onclick="event.stopPropagation()">
+    <button class="about-close" onclick="hideHelp()">✕</button>
+    <div class="help-icon-large" id="help-icon">?</div>
+    <h3 id="help-title" style="color:var(--primary);margin:0 0 10px"></h3>
+    <div id="help-body" style="font-size:0.85rem;line-height:1.7;color:var(--text)"></div>
+  </div>
+</div>
 
 <!-- About modal -->
 <div id="about-overlay" onclick="hideAbout()">

@@ -220,14 +220,32 @@ function renderDashboard() {
     </div>
 
     <div class="card">
+      <div style="display:flex;align-items:center;justify-content:space-between">
+        <div class="card-title" style="margin:0">Live Spectrogram ${helpBtn('spectrogram')}</div>
+        <button class="btn btn-sm btn-outline" id="btn-spec-toggle" onclick="toggleSpectrogram()">■ Stop</button>
+      </div>
+      <div class="spec-panel show" id="spec-panel">
+        <div class="spec-toolbar">
+          <label>Mic</label>
+          <select id="spec-device"><option value="">Default microphone</option></select>
+          <label><input type="checkbox" id="spec-log" style="accent-color:var(--primary)"> Log scale</label>
+        </div>
+        <div class="spec-wrap">
+          <canvas id="spec-canvas" width="1200" height="220"></canvas>
+          <div class="spec-freq-axis" id="spec-axis"></div>
+        </div>
+      </div>
+    </div>
+
+    <div class="card">
       <div class="card-title">Recording Devices</div>
       <div id="device-panel"><div class="empty">Loading devices...</div></div>
     </div>
 
     <div class="card" style="flex:1">
-      <div class="card-title">Live Detections</div>
+      <div class="card-title">Live Detections ${helpBtn('live_detections')}</div>
       <div class="vu-meter" id="vu-meter">
-        <span class="vu-label">🎙 Audio in</span>
+        <span class="vu-label">🎙 Audio in ${helpBtn('vu_meter')}</span>
         <div class="vu-bar-wrap"><div class="vu-bar" id="vu-bar"></div></div>
         <span class="vu-db" id="vu-db"><span class="vu-no-signal">no signal</span></span>
       </div>
@@ -237,6 +255,7 @@ function renderDashboard() {
   `;
 
   refreshDashboard();
+  _startSpectrogram();
 }
 
 async function refreshDashboard() {
@@ -395,7 +414,7 @@ function detectionCard(det) {
 async function renderSchedule() {
   document.getElementById('main').innerHTML = `
     <div class="card">
-      <div class="card-title">Today's Listening Windows</div>
+      <div class="card-title">Today's Listening Windows ${helpBtn('schedule')}</div>
       <div id="schedule-table"><div class="empty">Loading...</div></div>
     </div>
     <div class="card">
@@ -415,7 +434,7 @@ async function renderSchedule() {
       </div>
     </div>
     <div class="card">
-      <div class="card-title">Classifiers & Microphones</div>
+      <div class="card-title">Classifiers & Microphones ${helpBtn('classifiers')}</div>
       <p style="font-size:0.82rem;color:var(--muted);margin-bottom:14px">
         Select which classifiers are active and which microphone each one uses.
         Changes apply when the next listening session starts.
@@ -439,7 +458,7 @@ const _CLF_META = {
   bat:    { icon: '🦇', label: 'Bats',     note: 'Requires ultrasonic mic (≥192kHz)' },
   bee:    { icon: '🐝', label: 'Bees',     note: 'Standard microphone (16kHz) — BuzzDetect v1.0.1' },
   insect: { icon: '🦗', label: 'Insects',  note: 'Standard microphone (44.1kHz) — grasshoppers, bush crickets' },
-  soil:   { icon: '🌱', label: 'Soil',     note: 'Surface / contact microphone (22kHz)' },
+  soil:   { icon: '🌱', label: 'Soil',     note: 'Surface / contact microphone (22kHz) — Soil Acoustic Index (beta)' },
 };
 
 async function loadClassifierDevices() {
@@ -557,7 +576,7 @@ async function deleteWindow(name) {
 async function renderClips() {
   document.getElementById('main').innerHTML = `
     <div class="card" style="flex:1">
-      <div class="card-title">Audio Clip Library</div>
+      <div class="card-title">Audio Clip Library ${helpBtn('clips')}</div>
       <div class="tabs" id="clips-tabs">
         ${CLASSIFIERS.map(c => `<button class="tab ${c.key === 'all' ? 'active' : ''}"
           onclick="filterClips('${c.key}', this)">${c.icon} ${c.label}</button>`).join('')}
@@ -695,7 +714,7 @@ async function renderReports() {
     </div>
 
     <div class="card">
-      <div class="card-title">Summary</div>
+      <div class="card-title">Summary ${helpBtn('reports')}</div>
       <div id="report-content"><div class="empty">Select filters and click Load Report.</div></div>
     </div>
 
@@ -711,7 +730,7 @@ async function renderReports() {
     </div>
 
     <div class="card">
-      <div class="card-title">Activity Heatmaps</div>
+      <div class="card-title">Activity Heatmaps ${helpBtn('heatmap')}</div>
       <div id="heatmap-section"><div class="heatmap-empty">Load a report above to generate heatmaps.</div></div>
     </div>
 
@@ -901,7 +920,7 @@ async function confirmClearLogs() {
 async function renderSettings() {
   document.getElementById('main').innerHTML = `
     <div class="card">
-      <div class="card-title">Recording Location</div>
+      <div class="card-title">Recording Location ${helpBtn('location')}</div>
       <p style="font-size:0.82rem;color:var(--muted);margin-bottom:16px">
         Used for BirdNET species filtering, CSV logs, and MQTT detection messages.
       </p>
@@ -926,7 +945,7 @@ async function renderSettings() {
     </div>
 
     <div class="card">
-      <div class="card-title">MQTT Live Feed</div>
+      <div class="card-title">MQTT Live Feed ${helpBtn('mqtt')}</div>
       <p style="font-size:0.82rem;color:var(--muted);margin-bottom:16px">
         Publish every detection as JSON to an MQTT broker in real time.
         Credentials are stored locally and never committed to git.
@@ -1112,6 +1131,135 @@ async function saveLocation() {
   } finally { btnDone(btn); }
 }
 
+/* ── Help system ── */
+const HELP = {
+  spectrogram: {
+    icon: '🔬', title: 'Live Spectrogram',
+    body: `<p>A spectrogram is a visual representation of sound — it shows <strong>which frequencies are present</strong> in the audio at each moment in time.</p>
+    <p><strong>How to read it:</strong></p>
+    <ul style="padding-left:16px;margin:8px 0">
+      <li>The <strong>horizontal axis</strong> is time, scrolling left as new audio arrives on the right.</li>
+      <li>The <strong>vertical axis</strong> is frequency — low sounds (bass, worms, wind) at the bottom, high sounds (birdsong, insects) at the top.</li>
+      <li><strong>Colour</strong> indicates loudness: dark = quiet, bright green/yellow/red = loud.</li>
+    </ul>
+    <p>Bird calls appear as bright horizontal streaks in the 2–8 kHz band. The dawn chorus produces a spectacular burst of overlapping streaks. Bee buzzes appear as a diffuse band around 200–400 Hz. Soil activity appears as faint low-frequency texture near the bottom.</p>
+    <p><em>Log scale</em> compresses the upper frequencies and expands the lower ones — useful for seeing soil and low-frequency signals that would otherwise be squeezed into a thin strip.</p>`
+  },
+  vu_meter: {
+    icon: '🎙', title: 'Audio Level (VU Meter)',
+    body: `<p>The bar shows the <strong>current volume level</strong> from the microphone in decibels (dB). It updates every second while the pipeline is listening.</p>
+    <p><strong>What the numbers mean:</strong></p>
+    <ul style="padding-left:16px;margin:8px 0">
+      <li><strong>–60 dB or lower</strong> — near silence; the microphone is picking up very little.</li>
+      <li><strong>–40 to –20 dB</strong> — typical ambient outdoor level; good for detection.</li>
+      <li><strong>–10 dB or higher</strong> — loud sound nearby (close bird call, wind gust, handling noise).</li>
+    </ul>
+    <p>If the bar never moves, the microphone may not be capturing audio — check the device selection in Recording Devices.</p>`
+  },
+  live_detections: {
+    icon: '◈', title: 'Live Detection Feed',
+    body: `<p>Every time an AI classifier identifies a species with sufficient confidence, a detection card appears here in real time.</p>
+    <p>Each card shows the <strong>species name</strong>, <strong>confidence score</strong> (how certain the model is), the <strong>classifier</strong> that made the identification (bird, bat, bee, etc.), and the <strong>time</strong> of the detection.</p>
+    <p><strong>Confidence scores</strong> range from 0% to 100%. A score above ~70% is generally reliable; scores of 35–50% are possible matches worth noting but treated as lower confidence. The minimum threshold is set in Settings.</p>
+    <p>Use the <strong>tabs</strong> (Birds, Bats, Bees…) to filter the feed by organism group.</p>`
+  },
+  schedule: {
+    icon: '🕐', title: 'Listening Schedule',
+    body: `<p>The schedule defines <strong>when BASE listens</strong>. Windows are defined relative to solar events at your location — sunrise, sunset, or noon — so the timing shifts automatically with the seasons without manual adjustment.</p>
+    <p><strong>Default windows:</strong></p>
+    <ul style="padding-left:16px;margin:8px 0">
+      <li><strong>Dawn chorus</strong> — 30 minutes before sunrise. The most productive window for bird song; songbirds begin calling before light to establish territory.</li>
+      <li><strong>Morning song</strong> — 90 minutes after sunrise. A secondary activity peak as birds resume feeding.</li>
+      <li><strong>Dusk</strong> — 60 minutes before sunset. Evening song, roost calls, and bat emergence.</li>
+    </ul>
+    <p>You can add custom windows (e.g. a fixed midnight bat survey) using the form below. Adaptive windows are added automatically — for example, if an owl is detected, a night window is enabled.</p>`
+  },
+  classifiers: {
+    icon: '🐦', title: 'Classifiers & Microphones',
+    body: `<p>A <strong>classifier</strong> is an AI model trained to identify a specific group of organisms from audio. BASE runs multiple classifiers simultaneously, each tuned to a different frequency range and organism type.</p>
+    <ul style="padding-left:16px;margin:8px 0">
+      <li><strong>🐦 Birds</strong> — BirdNET (Cornell Lab). 6,000+ species, 48 kHz. Standard microphone.</li>
+      <li><strong>🦇 Bats</strong> — BatDetect2 (Univ. Edinburgh). 17 UK species, 192+ kHz. Requires an <em>ultrasonic</em> microphone.</li>
+      <li><strong>🐝 Bees</strong> — BuzzDetect v1.0.1 (OSU Bee Lab). Detects insect flight buzz at 16 kHz. Standard microphone.</li>
+      <li><strong>🦗 Insects</strong> — OrthopterOSS (coming). Grasshoppers and bush crickets, 2–20 kHz.</li>
+      <li><strong>🌱 Soil</strong> — Blenheim Innovation. Soil Acoustic Index (beta) — worm movement, root activity, 50–2000 Hz. Best with a contact/geophone microphone.</li>
+    </ul>
+    <p>Each classifier can be assigned a <strong>different microphone</strong>. This means a bat ultrasonic mic and a standard bird mic can record simultaneously from different devices.</p>`
+  },
+  clips: {
+    icon: '🎵', title: 'Audio Clip Library',
+    body: `<p>BASE saves short WAV audio clips for each detected species, organised by type and species. These are the raw audio segments that triggered a detection.</p>
+    <p>Clips let you <strong>verify detections by ear</strong> — listen to confirm that the model identified the sound correctly. This is especially useful for rare or unexpected species.</p>
+    <p>The library applies smart retention: new species are always saved; common species clips are only kept if their confidence score exceeds a threshold, and the lowest-confidence clip is replaced when the per-species limit is reached. This prevents the disk filling with low-quality recordings of abundant species.</p>
+    <p>Use the <strong>type tabs</strong> to browse by organism group, then click a species to see its clips.</p>`
+  },
+  reports: {
+    icon: '📊', title: 'Reports',
+    body: `<p>The Reports page lets you summarise, filter, and export detection data across any date range.</p>
+    <p><strong>Filters:</strong> Narrow results by date range, organism type (Birds, Bats, Bees…), and individual species. Changing the type filter automatically refreshes the species dropdown to show only species of that type.</p>
+    <p><strong>Downloads</strong> export filtered data as CSV files compatible with Excel, R, Python, and most ecological analysis software. <em>Detections CSV</em> has one row per individual detection; <em>Sessions CSV</em> has one row per species per listening window, with aggregate statistics.</p>
+    <p><strong>Clear All Logs</strong> permanently deletes all detection and session data. This cannot be undone — download your data first.</p>`
+  },
+  heatmap: {
+    icon: '🌡', title: 'Activity Heatmaps',
+    body: `<p>Heatmaps reveal <strong>patterns in when species are active</strong> across time — something that is impossible to see in a list of individual detections.</p>
+    <p><strong>Time of Day heatmap:</strong> Each row is a species; each column is an hour (00:00–23:00). Darker green indicates more detections in that hour. Dawn chorus species like Robin and Blackbird will show a clear early-morning peak. Nocturnal species like owls and bats will show activity after dusk.</p>
+    <p><strong>Month of Year heatmap:</strong> Same species rows, but columns represent January through December. As data accumulates across seasons, this reveals whether a species is a summer migrant, a winter visitor, or resident year-round.</p>
+    <p>These heatmaps are generated fresh from your detection data each time — the longer BASE runs, the richer the patterns become.</p>`
+  },
+  sai: {
+    icon: '🌱', title: 'Soil Acoustic Index (SAI)',
+    body: `<p>The Soil Acoustic Index (SAI) is a <strong>beta measure of biological activity in the soil</strong>, derived from audio captured by a contact microphone or geophone placed on or in the soil.</p>
+    <p>After the audio is bandpass-filtered (50–2000 Hz) to remove wind, traffic, and high-frequency noise, three acoustic indices are combined:</p>
+    <ul style="padding-left:16px;margin:8px 0">
+      <li><strong>RMS energy</strong> — raw signal strength; scales with the intensity of activity.</li>
+      <li><strong>Acoustic Complexity Index (ACI)</strong> — measures how varied the sound is across time. Biological signals (worm movement, root growth) produce irregular, complex patterns; mechanical interference (vibration, rain) produces regular, repeating patterns.</li>
+      <li><strong>Spectral entropy</strong> — biological broadband activity spreads energy across many frequencies (high entropy); monotone mechanical noise concentrates it (low entropy).</li>
+    </ul>
+    <p><em>This is a beta feature.</em> The thresholds have not been calibrated against labelled soil recordings from Blenheim — treat SAI values as indicative and useful for relative comparison across time, not as absolute measurements.</p>`
+  },
+  mqtt: {
+    icon: '📡', title: 'MQTT Live Feed',
+    body: `<p>MQTT (Message Queuing Telemetry Transport) is a lightweight messaging protocol designed for low-bandwidth, real-time data — originally developed for satellite telemetry and now widely used in IoT and ecological monitoring.</p>
+    <p>When enabled, BASE publishes every detection as a JSON message to an MQTT broker within milliseconds of the species being identified. Any connected subscriber — a dashboard, alerting system, database, or custom application — receives the data instantly.</p>
+    <p><strong>Connection modes:</strong></p>
+    <ul style="padding-left:16px;margin:8px 0">
+      <li><strong>Direct</strong> — BASE connects straight to a broker (e.g. EMQX Cloud). Good when the machine has internet access.</li>
+      <li><strong>Bridge</strong> — BASE connects to a local Mosquitto broker, which forwards to a cloud broker. Good when using a fixed local IP on a private network.</li>
+    </ul>
+    <p>Use the <strong>Test Connection</strong> button to verify your broker credentials before starting a session.</p>`
+  },
+  location: {
+    icon: '📍', title: 'Recording Location',
+    body: `<p>The location name, latitude, and longitude are included in every detection record — in the CSV exports, the MQTT payload, and the detection log.</p>
+    <p><strong>Why it matters:</strong></p>
+    <ul style="padding-left:16px;margin:8px 0">
+      <li>BirdNET uses the coordinates to apply a <strong>regional species filter</strong> — it prioritises species known to occur at your location and season, improving accuracy.</li>
+      <li>Location data makes exported CSVs <strong>directly importable into ecological databases</strong> (NBN Atlas, iRecord, GBIF) without manual annotation.</li>
+      <li>If you run BASE at multiple sites, each deployment gets its own name, making it easy to compare data across locations.</li>
+    </ul>`
+  }
+};
+
+function showHelp(topic) {
+  const h = HELP[topic];
+  if (!h) return;
+  document.getElementById('help-icon').textContent = h.icon;
+  document.getElementById('help-title').textContent = h.title;
+  document.getElementById('help-body').innerHTML = h.body;
+  document.getElementById('help-overlay').classList.add('show');
+}
+function hideHelp() {
+  document.getElementById('help-overlay').classList.remove('show');
+}
+document.addEventListener('keydown', e => { if (e.key === 'Escape') { hideHelp(); hideAbout(); } });
+window.showHelp = showHelp;
+window.hideHelp = hideHelp;
+
+function helpBtn(topic) {
+  return `<span class="help-icon" onclick="showHelp('${topic}')" title="Help">?</span>`;
+}
+
 /* ── About modal ── */
 function showAbout() {
   const v = document.getElementById('about-version');
@@ -1125,6 +1273,156 @@ function hideAbout() {
 document.addEventListener('keydown', e => { if (e.key === 'Escape') hideAbout(); });
 window.showAbout = showAbout;
 window.hideAbout = hideAbout;
+
+/* ── Live Spectrogram ── */
+const _spec = {
+  running: false,
+  animFrame: null,
+  audioCtx: null,
+  analyser: null,
+  stream: null,
+  imageData: null,
+};
+
+// Viridis-inspired colormap scaled to BASE's green theme
+function _specColor(v) {
+  // v: 0–255
+  if (v < 12)  return [13, 26, 16];          // background (silent)
+  if (v < 50)  return [15, 45, 80];          // dark blue
+  if (v < 100) return [20, 100, 120];         // teal
+  if (v < 150) return [40, 160, 100];         // green
+  if (v < 200) return [130, 210, 60];         // yellow-green
+  if (v < 230) return [230, 180, 30];         // amber
+  return            [255, 80,  30];           // hot red-orange
+}
+
+function _buildFreqAxis(sampleRate, logScale) {
+  const el = document.getElementById('spec-axis');
+  if (!el) return;
+  const nyquist = sampleRate / 2;
+  const labels = logScale
+    ? [nyquist, 16000, 8000, 4000, 2000, 1000, 500, 200, 50]
+    : [nyquist, Math.round(nyquist*0.75), Math.round(nyquist*0.5), Math.round(nyquist*0.25), 0];
+  el.innerHTML = labels
+    .map(f => `<span>${f >= 1000 ? (f/1000).toFixed(f%1000?1:0)+'k' : f}</span>`)
+    .join('');
+}
+
+async function toggleSpectrogram() {
+  const panel = document.getElementById('spec-panel');
+  const btn   = document.getElementById('btn-spec-toggle');
+  if (_spec.running) {
+    _stopSpectrogram();
+    panel.classList.remove('show');
+    btn.textContent = '▶ Start';
+    return;
+  }
+  panel.classList.add('show');
+  btn.textContent = '⟳ Starting…';
+
+  // Populate mic dropdown from browser device list
+  try {
+    // Request permission first so labels are populated
+    const tmp = await navigator.mediaDevices.getUserMedia({ audio: true });
+    tmp.getTracks().forEach(t => t.stop());
+    const devices = await navigator.mediaDevices.enumerateDevices();
+    const sel = document.getElementById('spec-device');
+    sel.innerHTML = '<option value="">Default microphone</option>';
+    devices.filter(d => d.kind === 'audioinput').forEach(d => {
+      const opt = document.createElement('option');
+      opt.value = d.deviceId;
+      opt.textContent = d.label || `Microphone ${d.deviceId.slice(0,6)}`;
+      sel.appendChild(opt);
+    });
+  } catch (_) {}
+
+  await _startSpectrogram();
+  btn.textContent = '■ Stop';
+}
+
+async function _startSpectrogram() {
+  const deviceId = document.getElementById('spec-device')?.value || null;
+  const constraints = { audio: deviceId ? { deviceId: { exact: deviceId } } : true, video: false };
+  try {
+    _spec.stream = await navigator.mediaDevices.getUserMedia(constraints);
+    _spec.audioCtx = new AudioContext();
+    _spec.analyser = _spec.audioCtx.createAnalyser();
+    _spec.analyser.fftSize = 4096;          // 2048 bins → good freq resolution
+    _spec.analyser.smoothingTimeConstant = 0.4;
+    _spec.audioCtx.createMediaStreamSource(_spec.stream).connect(_spec.analyser);
+
+    const canvas = document.getElementById('spec-canvas');
+    canvas.width = canvas.offsetWidth || 1200;
+    const ctx = canvas.getContext('2d');
+    ctx.fillStyle = '#0d1a10';
+    ctx.fillRect(0, 0, canvas.width, canvas.height);
+
+    _buildFreqAxis(_spec.audioCtx.sampleRate,
+      document.getElementById('spec-log')?.checked || false);
+
+    _spec.running = true;
+    _specDraw();
+  } catch (err) {
+    toast(`Spectrogram: ${err.message}`, 'error', 5000);
+    document.getElementById('btn-spec-toggle').textContent = '▶ Start';
+  }
+}
+
+function _stopSpectrogram() {
+  _spec.running = false;
+  if (_spec.animFrame) cancelAnimationFrame(_spec.animFrame);
+  if (_spec.stream) _spec.stream.getTracks().forEach(t => t.stop());
+  if (_spec.audioCtx) _spec.audioCtx.close();
+  _spec.analyser = _spec.audioCtx = _spec.stream = null;
+}
+
+function _specDraw() {
+  if (!_spec.running) return;
+  const canvas = document.getElementById('spec-canvas');
+  if (!canvas) { _spec.running = false; return; }
+  const ctx = canvas.getContext('2d');
+  const analyser = _spec.analyser;
+  const logScale = document.getElementById('spec-log')?.checked || false;
+
+  const bins = analyser.frequencyBinCount;   // 2048
+  const data = new Uint8Array(bins);
+  analyser.getByteFrequencyData(data);
+
+  const w = canvas.width;
+  const h = canvas.height;
+
+  // Scroll left by 2px for readable speed
+  const scroll = 2;
+  const img = ctx.getImageData(scroll, 0, w - scroll, h);
+  ctx.putImageData(img, 0, 0);
+
+  // Draw new columns on the right
+  const col = ctx.createImageData(scroll, h);
+  const px  = col.data;
+
+  for (let y = 0; y < h; y++) {
+    let binIndex;
+    if (logScale) {
+      // Logarithmic mapping: maps low frequencies to more vertical space
+      const t = 1 - y / h;
+      binIndex = Math.floor(Math.pow(bins, t));
+      binIndex = Math.min(binIndex, bins - 1);
+    } else {
+      binIndex = Math.floor((1 - y / h) * (bins - 1));
+    }
+    const value = data[binIndex];
+    const [r, g, b] = _specColor(value);
+    for (let xi = 0; xi < scroll; xi++) {
+      const i = (y * scroll + xi) * 4;
+      px[i] = r; px[i+1] = g; px[i+2] = b; px[i+3] = 255;
+    }
+  }
+  ctx.putImageData(col, w - scroll, 0);
+
+  _spec.animFrame = requestAnimationFrame(_specDraw);
+}
+
+window.toggleSpectrogram = toggleSpectrogram;
 
 /* ── Boot ── */
 router.init();
