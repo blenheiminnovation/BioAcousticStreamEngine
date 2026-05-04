@@ -1320,20 +1320,41 @@ async function toggleSpectrogram() {
   panel.classList.add('show');
   btn.textContent = '⟳ Starting…';
 
-  // Populate mic dropdown from browser device list
+  // Populate mic dropdown — merge browser enumerateDevices() with server pactl list
+  // The browser often only exposes one device on Linux/PipeWire; the server API
+  // uses pactl to find all physical sources, and PipeWire accepts their names as deviceIds.
   try {
-    // Request permission first so labels are populated
     const tmp = await navigator.mediaDevices.getUserMedia({ audio: true });
     tmp.getTracks().forEach(t => t.stop());
-    const devices = await navigator.mediaDevices.enumerateDevices();
+
+    const [browserDevices, serverData] = await Promise.all([
+      navigator.mediaDevices.enumerateDevices(),
+      api.get('/api/devices').catch(() => ({ devices: [] })),
+    ]);
+
     const sel = document.getElementById('spec-device');
-    sel.innerHTML = '<option value="">Default microphone</option>';
-    devices.filter(d => d.kind === 'audioinput').forEach(d => {
+    sel.innerHTML = '<option value="">System default</option>';
+
+    // Server devices first (pactl — most reliable on Linux/PipeWire)
+    serverData.devices.forEach(d => {
       const opt = document.createElement('option');
-      opt.value = d.deviceId;
-      opt.textContent = d.label || `Microphone ${d.deviceId.slice(0,6)}`;
+      opt.value = d.name;   // pactl source name works as PipeWire deviceId
+      opt.textContent = `${d.is_default ? '★ ' : ''}${d.label || d.name} (${(d.sample_rate/1000).toFixed(0)}kHz)`;
       sel.appendChild(opt);
     });
+
+    // Add any browser-only devices not already covered
+    const serverNames = new Set(serverData.devices.map(d => d.label || d.name));
+    browserDevices
+      .filter(d => d.kind === 'audioinput' && d.deviceId !== 'default' && d.deviceId !== '')
+      .forEach(d => {
+        if (!serverNames.has(d.label)) {
+          const opt = document.createElement('option');
+          opt.value = d.deviceId;
+          opt.textContent = d.label || `Microphone (${d.deviceId.slice(0, 8)})`;
+          sel.appendChild(opt);
+        }
+      });
   } catch (_) {}
 
   await _startSpectrogram();
@@ -1342,7 +1363,9 @@ async function toggleSpectrogram() {
 
 async function _startSpectrogram() {
   const deviceId = document.getElementById('spec-device')?.value || null;
-  const constraints = { audio: deviceId ? { deviceId: { exact: deviceId } } : true, video: false };
+  // Use 'ideal' rather than 'exact' — PipeWire/pactl source names work with ideal
+  // but may fail with exact if the browser maps them differently
+  const constraints = { audio: deviceId ? { deviceId: { ideal: deviceId } } : true, video: false };
   try {
     _spec.stream = await navigator.mediaDevices.getUserMedia(constraints);
     _spec.audioCtx = new AudioContext();
