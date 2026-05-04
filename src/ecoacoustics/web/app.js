@@ -700,11 +700,11 @@ async function renderReports() {
       <div class="form-row" style="align-items:flex-end">
         <div class="form-group">
           <label>From</label>
-          <input type="date" id="r-from" value="${weekAgo}">
+          <input type="date" id="r-from" lang="en-GB" value="${weekAgo}">
         </div>
         <div class="form-group">
           <label>To</label>
-          <input type="date" id="r-to" value="${today}">
+          <input type="date" id="r-to" lang="en-GB" value="${today}">
         </div>
         <div class="form-group">
           <label>Type</label>
