@@ -42,17 +42,20 @@ fi
 ok "Python packages installed"
 
 # ── 3. BuzzDetect (bee classifier model) ─────────────────────────────────────
+# Pre-fetch so first run is instant. If skipped, BASE downloads it automatically
+# the first time the bee classifier loads (requires git at runtime).
 step "Setting up BuzzDetect bee model"
 
 BUZZ_DIR="external/buzzdetect"
 if [ ! -d "$BUZZ_DIR" ]; then
-  if ! command -v git &>/dev/null; then
-    err "git is required to download BuzzDetect. Install it with: sudo apt-get install git"
+  if command -v git &>/dev/null; then
+    mkdir -p external
+    git clone --depth 1 --branch v1.0.1 \
+      https://github.com/OSU-Bee-Lab/buzzdetect.git "$BUZZ_DIR"
+    ok "BuzzDetect cloned to $BUZZ_DIR"
+  else
+    warn "git not found — BuzzDetect will be downloaded automatically on first run"
   fi
-  mkdir -p external
-  git clone --depth 1 --branch v1.0.1 \
-    https://github.com/OSU-Bee-Lab/buzzdetect.git "$BUZZ_DIR"
-  ok "BuzzDetect cloned to $BUZZ_DIR"
 else
   ok "BuzzDetect already present at $BUZZ_DIR"
 fi

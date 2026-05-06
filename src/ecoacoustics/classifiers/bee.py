@@ -76,11 +76,37 @@ class BeeClassifier(BaseClassifier):
 
     def load(self) -> None:
         if not _BUZZDETECT_DIR.exists():
-            raise RuntimeError(
-                f"BuzzDetect not found at {_BUZZDETECT_DIR}. "
-                "Run: git clone --depth 1 --branch v1.0.1 "
-                "https://github.com/OSU-Bee-Lab/buzzdetect.git external/buzzdetect"
+            _log.info("BuzzDetect model not found — downloading automatically…")
+            self._fetch_buzzdetect()
+        self._load_models()
+
+    def _fetch_buzzdetect(self) -> None:
+        import subprocess
+        from rich.console import Console
+        _con = Console()
+        _con.print("[dim]Downloading BuzzDetect bee model (first-time setup, ~16 MB)…[/dim]")
+        _BUZZDETECT_DIR.parent.mkdir(parents=True, exist_ok=True)
+        try:
+            subprocess.run(
+                ["git", "clone", "--depth", "1", "--branch", "v1.0.1",
+                 "https://github.com/OSU-Bee-Lab/buzzdetect.git",
+                 str(_BUZZDETECT_DIR)],
+                check=True, capture_output=True, text=True,
             )
+            _con.print("[dim]BuzzDetect downloaded.[/dim]")
+        except FileNotFoundError:
+            raise RuntimeError(
+                "git is required to download the BuzzDetect bee model. "
+                "Install it with: sudo apt-get install git"
+            )
+        except subprocess.CalledProcessError as exc:
+            raise RuntimeError(
+                f"Failed to download BuzzDetect: {exc.stderr.strip()}\n"
+                "Try manually: git clone --depth 1 --branch v1.0.1 "
+                "https://github.com/OSU-Bee-Lab/buzzdetect.git external/buzzdetect"
+            ) from exc
+
+    def _load_models(self) -> None:
 
         import json
         import tensorflow as tf

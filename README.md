@@ -69,12 +69,7 @@ python3 -m venv .venv
 
 #### 3. Bee classifier model (BuzzDetect)
 
-The bee classifier requires the BuzzDetect model files, which are downloaded separately:
-
-```bash
-git clone --depth 1 --branch v1.0.1 \
-  https://github.com/OSU-Bee-Lab/buzzdetect.git external/buzzdetect
-```
+No action needed — if `bee` is active in `config/settings.yaml`, BASE downloads the BuzzDetect model automatically on first run (~16 MB, one-time). Requires `git` to be installed.
 
 #### 4. Output directories and config
 
@@ -522,7 +517,7 @@ The pipeline will automatically set up the correct audio stream and frequency fi
 
 | Model | Classifier | How to install |
 |---|---|---|
-| [BuzzDetect v1.0.1](https://github.com/OSU-Bee-Lab/buzzdetect) | Bee | `git clone --depth 1 --branch v1.0.1 https://github.com/OSU-Bee-Lab/buzzdetect.git external/buzzdetect` (done automatically by `install.sh`) |
+| [BuzzDetect v1.0.1](https://github.com/OSU-Bee-Lab/buzzdetect) | Bee | Downloaded automatically on first run (requires `git`). `install.sh` also handles this proactively. |
 | BirdNET weights | Bird | Downloaded automatically by `birdnetlib` on first run |
 | BatDetect2 weights | Bat | Downloaded automatically by `batdetect2` on first run |
 
