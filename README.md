@@ -25,36 +25,79 @@ This project was born from a belief that technology can bring people closer to t
 
 ## Quick Start
 
-### 1. System dependency
+The easiest way to install is with the provided script — it handles all system libraries, Python packages, the BuzzDetect bee model, and config files in one step:
 
 ```bash
-sudo apt-get install -y libportaudio2
+git clone https://github.com/blenheiminnovation/BioAcousticStreamEngine.git
+cd BioAcousticStreamEngine
+bash install.sh
 ```
 
-### 2. Python environment
+Then launch the web UI:
+
+```bash
+bash start_web.sh
+```
+
+A browser tab opens automatically at `http://localhost:8000`. Edit `config/settings.yaml` to set your recording location and active classifiers.
+
+---
+
+### Manual install
+
+If you prefer to install step by step:
+
+#### 1. System libraries
+
+```bash
+sudo apt-get install -y \
+  libportaudio2 \
+  libsndfile1 \
+  python3-venv \
+  python3-dev \
+  git
+```
+
+> **Audio device listing** (web UI): also requires `pactl`, which ships with PipeWire/PulseAudio. Install with `sudo apt-get install -y pipewire-pulse` if not already present.
+
+#### 2. Python environment
 
 ```bash
 python3 -m venv .venv
-.venv/bin/pip install -e ".[dev]"
+.venv/bin/pip install -e "."
 ```
 
-### 3. Run
+#### 3. Bee classifier model (BuzzDetect)
+
+The bee classifier requires the BuzzDetect model files, which are downloaded separately:
 
 ```bash
-# Listen now until Ctrl+C
-.venv/bin/python -m ecoacoustics.main wake
+git clone --depth 1 --branch v1.0.1 \
+  https://github.com/OSU-Bee-Lab/buzzdetect.git external/buzzdetect
+```
 
-# Listen for a set duration
-.venv/bin/python -m ecoacoustics.main wake --duration 30
+#### 4. Output directories and config
 
-# Run the automated dawn/dusk schedule
-.venv/bin/python -m ecoacoustics.main schedule
+```bash
+mkdir -p output/clips
+cp config/settings.yaml.example config/settings.yaml
+cp config/secrets.yaml.example config/secrets.yaml
+```
 
-# Show today's schedule and detection summary
-.venv/bin/python -m ecoacoustics.main status
+Edit `config/settings.yaml` to set your location (latitude/longitude) and which classifiers to run.
 
-# List available microphone devices
-.venv/bin/python -m ecoacoustics.main list-devices
+#### 5. Run
+
+```bash
+# Launch the web UI (recommended)
+bash start_web.sh
+
+# Or use the command line:
+.venv/bin/python -m ecoacoustics.main wake            # listen until Ctrl+C
+.venv/bin/python -m ecoacoustics.main wake --duration 30  # listen for 30 min
+.venv/bin/python -m ecoacoustics.main schedule        # run dawn/dusk schedule
+.venv/bin/python -m ecoacoustics.main status          # today's summary
+.venv/bin/python -m ecoacoustics.main list-devices    # list microphones
 ```
 
 ---
@@ -443,14 +486,29 @@ The pipeline will automatically set up the correct audio stream and frequency fi
 
 ## Dependencies
 
+### System libraries (Linux)
+
+| Library | Purpose | Install |
+|---|---|---|
+| `libportaudio2` | Audio capture runtime (sounddevice) | `apt-get install libportaudio2` |
+| `libsndfile1` | Audio file I/O runtime (soundfile/librosa) | `apt-get install libsndfile1` |
+| `python3-venv` | Python virtual environment support | `apt-get install python3-venv` |
+| `python3-dev` | Python headers for compiled pip packages | `apt-get install python3-dev` |
+| `pipewire-pulse` / `pulseaudio` | `pactl` command for audio device listing in web UI | `apt-get install pipewire-pulse` |
+| `git` | Required to clone BuzzDetect bee model | `apt-get install git` |
+
+### Python packages
+
 | Package | Purpose |
 |---|---|
 | `sounddevice` | Microphone capture |
+| `soundfile` | Audio file reading/writing |
 | `birdnetlib` | BirdNET-Analyzer Python wrapper |
 | `tensorflow-cpu` | TFLite runtime for BirdNET model |
 | `batdetect2` | BatDetect2 PyTorch model |
 | `librosa` | Audio resampling |
 | `scipy` | Bandpass filtering |
+| `numpy` | Numerical audio processing |
 | `astral` | Sunrise/sunset calculation |
 | `rich` | Terminal display |
 | `PyYAML` | Configuration loading |
@@ -458,6 +516,15 @@ The pipeline will automatically set up the correct audio stream and frequency fi
 | `fastapi` | REST API and WebSocket server for web UI |
 | `uvicorn` | ASGI server |
 | `websockets` | WebSocket support |
+| `python-multipart` | File upload handling in web UI |
+
+### External models (not on PyPI)
+
+| Model | Classifier | How to install |
+|---|---|---|
+| [BuzzDetect v1.0.1](https://github.com/OSU-Bee-Lab/buzzdetect) | Bee | `git clone --depth 1 --branch v1.0.1 https://github.com/OSU-Bee-Lab/buzzdetect.git external/buzzdetect` (done automatically by `install.sh`) |
+| BirdNET weights | Bird | Downloaded automatically by `birdnetlib` on first run |
+| BatDetect2 weights | Bat | Downloaded automatically by `batdetect2` on first run |
 
 ---
 
