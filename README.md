@@ -437,7 +437,7 @@ The pipeline will automatically set up the correct audio stream and frequency fi
 - [x] Bee buzz classifier — BuzzDetect v1.0.1 (YAMNet, 16 kHz; detects insect flight buzz)
 - [ ] Insect classifier — grasshoppers and bush crickets via OrthopterOSS (wired and ready, awaiting model release)
 - [x] Soil Acoustic Index (SAI) — beta implementation using ACI + spectral entropy
-- [ ] Species activity heatmaps by time of day and season
+- [x] Species activity heatmaps by time of day and season
 
 ---
 
