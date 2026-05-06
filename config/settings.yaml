@@ -20,7 +20,6 @@ classifiers:
   active:
   - bird
   - bee
-  - insect
   devices:
     bat: null
     bee: null

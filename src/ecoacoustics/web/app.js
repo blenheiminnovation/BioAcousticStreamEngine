@@ -193,9 +193,25 @@ async function pollStatus() {
     updateHeader(state.status);
     if (state.page === 'dashboard') {
       updateStateBanner(state.status.pipelines || {});
+      // Update status-derived stat cards directly from what we already have
+      const windowEl = document.getElementById('stat-window')?.querySelector('.value');
+      if (windowEl) windowEl.textContent = state.status.schedule?.active_window || 'None';
+      const diskEl = document.getElementById('stat-disk')?.querySelector('.value');
+      if (diskEl) diskEl.textContent = state.status.disk_free_gb ?? '—';
       refreshDevicePanel();
+      _refreshSummaryStats();
     }
   } catch (_) { setConnected(false); }
+}
+
+async function _refreshSummaryStats() {
+  try {
+    const summary = await api.get('/api/detections/summary');
+    const speciesEl = document.getElementById('stat-species')?.querySelector('.value');
+    const callsEl   = document.getElementById('stat-calls')?.querySelector('.value');
+    if (speciesEl) speciesEl.textContent = summary.species_count ?? '—';
+    if (callsEl)   callsEl.textContent   = summary.total_calls   ?? '—';
+  } catch (_) {}
 }
 
 /* ─────────────────────────── DASHBOARD ─────────────────────────── */
@@ -227,7 +243,7 @@ function renderDashboard() {
       <div class="spec-panel show" id="spec-panel">
         <div class="spec-toolbar">
           <label>Mic</label>
-          <select id="spec-device"><option value="">Default microphone</option></select>
+          <select id="spec-device" onchange="changeSpecDevice()"><option value="">Default microphone</option></select>
           <label><input type="checkbox" id="spec-log" style="accent-color:var(--primary)"> Log scale</label>
         </div>
         <div class="spec-wrap">
@@ -255,28 +271,12 @@ function renderDashboard() {
   `;
 
   refreshDashboard();
-  _startSpectrogram();
+  _populateSpecDevices().then(() => _startSpectrogram());
 }
 
 async function refreshDashboard() {
   if (state.page !== 'dashboard') return;
-  try {
-    const [statusData, summary] = await Promise.all([
-      api.get('/api/status'),
-      api.get('/api/detections/summary'),
-    ]);
-    state.status = statusData;
-    setConnected(true);
-    updateHeader(statusData);
-    updateStateBanner(statusData.pipelines || {});
-
-    document.getElementById('stat-species').querySelector('.value').textContent = summary.species_count ?? '—';
-    document.getElementById('stat-calls').querySelector('.value').textContent = summary.total_calls ?? '—';
-    document.getElementById('stat-window').querySelector('.value').textContent = statusData.schedule.active_window || 'None';
-    document.getElementById('stat-disk').querySelector('.value').textContent = statusData.disk_free_gb ?? '—';
-
-    await refreshDevicePanel();
-  } catch (err) { setConnected(false); }
+  await pollStatus();
 }
 
 async function refreshDevicePanel() {
@@ -324,7 +324,7 @@ async function refreshDevicePanel() {
                    style="width:70px;padding:5px 8px;background:var(--surface);border:1px solid var(--border);border-radius:var(--radius);color:var(--text);font-size:0.78rem"
                    id="dur-${d.index}">
                  <button class="btn btn-sm btn-primary"
-                   onclick="startDevice('${key}','${safeLabel}',${d.is_default ? 'null' : d.index},this)">▶ Start</button>`
+                   onclick="startDevice('${key}','${safeLabel}',${d.index},this)">▶ Start</button>`
             }
           </div>
         </div>`;
@@ -352,6 +352,7 @@ async function startDevice(deviceKey, deviceName, deviceIndex, btn) {
     }
     toast(`Started — ${deviceName}`, 'success', 5000);
     await pollStatus();
+    _syncSpecToRunningDevice();
   } catch (err) {
     toast(err.message, 'error', 6000);
     btnDone(btn);
@@ -969,8 +970,8 @@ async function renderSettings() {
         <div class="form-group">
           <label>Connection mode</label>
           <select id="mqtt-mode">
-            <option value="direct">Direct — connect straight to broker</option>
-            <option value="bridge">Bridge — via local Mosquitto</option>
+            <option value="direct">Direct — Python connects to broker (cloud/remote, with credentials)</option>
+            <option value="bridge">Bridge — Python connects to local Mosquitto, which forwards upstream</option>
           </select>
         </div>
         <div class="form-group" style="flex:1">
@@ -1315,21 +1316,9 @@ function _buildFreqAxis(sampleRate, logScale) {
     .join('');
 }
 
-async function toggleSpectrogram() {
-  const panel = document.getElementById('spec-panel');
-  const btn   = document.getElementById('btn-spec-toggle');
-  if (_spec.running) {
-    _stopSpectrogram();
-    panel.classList.remove('show');
-    btn.textContent = '▶ Start';
-    return;
-  }
-  panel.classList.add('show');
-  btn.textContent = '⟳ Starting…';
-
-  // Populate mic dropdown — merge browser enumerateDevices() with server pactl list
-  // The browser often only exposes one device on Linux/PipeWire; the server API
-  // uses pactl to find all physical sources, and PipeWire accepts their names as deviceIds.
+// Populate the spectrogram mic dropdown from pactl (server) + browser device APIs.
+// Merges both sources so Linux/PipeWire users see all physical inputs.
+async function _populateSpecDevices() {
   try {
     const tmp = await navigator.mediaDevices.getUserMedia({ audio: true });
     tmp.getTracks().forEach(t => t.stop());
@@ -1340,17 +1329,17 @@ async function toggleSpectrogram() {
     ]);
 
     const sel = document.getElementById('spec-device');
+    if (!sel) return;
+    const prev = sel.value;
     sel.innerHTML = '<option value="">System default</option>';
 
-    // Server devices first (pactl — most reliable on Linux/PipeWire)
     serverData.devices.forEach(d => {
       const opt = document.createElement('option');
-      opt.value = d.name;   // pactl source name works as PipeWire deviceId
+      opt.value = d.name;
       opt.textContent = `${d.is_default ? '★ ' : ''}${d.label || d.name} (${(d.sample_rate/1000).toFixed(0)}kHz)`;
       sel.appendChild(opt);
     });
 
-    // Add any browser-only devices not already covered
     const serverNames = new Set(serverData.devices.map(d => d.label || d.name));
     browserDevices
       .filter(d => d.kind === 'audioinput' && d.deviceId !== 'default' && d.deviceId !== '')
@@ -1362,8 +1351,47 @@ async function toggleSpectrogram() {
           sel.appendChild(opt);
         }
       });
-  } catch (_) {}
 
+    // Restore previous selection if still available
+    if (prev && sel.querySelector(`option[value="${CSS.escape(prev)}"]`)) sel.value = prev;
+  } catch (_) {}
+}
+
+// Sync the spectrogram mic to whichever pipeline is currently running,
+// so the visual and the detector always show the same source.
+function _syncSpecToRunningDevice() {
+  const sel = document.getElementById('spec-device');
+  if (!sel || !state.status) return;
+  const running = Object.values(state.status.pipelines || {}).find(p => p.state !== 'idle');
+  if (!running || !running.device_name) return;
+  for (const opt of sel.options) {
+    if (opt.value && opt.textContent.includes(running.device_name)) {
+      if (sel.value === opt.value) return;
+      sel.value = opt.value;
+      if (_spec.running) { _stopSpectrogram(); _startSpectrogram(); }
+      return;
+    }
+  }
+}
+
+async function changeSpecDevice() {
+  if (!_spec.running) return;
+  _stopSpectrogram();
+  await _startSpectrogram();
+}
+
+async function toggleSpectrogram() {
+  const panel = document.getElementById('spec-panel');
+  const btn   = document.getElementById('btn-spec-toggle');
+  if (_spec.running) {
+    _stopSpectrogram();
+    panel.classList.remove('show');
+    btn.textContent = '▶ Start';
+    return;
+  }
+  panel.classList.add('show');
+  btn.textContent = '⟳ Starting…';
+  await _populateSpecDevices();
   await _startSpectrogram();
   btn.textContent = '■ Stop';
 }
@@ -1467,3 +1495,4 @@ window.deleteClip = deleteClip;
 window.startDevice = startDevice;
 window.stopDevice = stopDevice;
 window.setFilter = setFilter;
+window.changeSpecDevice = changeSpecDevice;

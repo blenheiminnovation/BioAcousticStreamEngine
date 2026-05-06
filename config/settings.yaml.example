@@ -1,0 +1,117 @@
+# Ecoacoustics — example configuration
+# Copy this file to settings.yaml and edit to suit your deployment.
+# Credentials (MQTT username/password) go in secrets.yaml — see secrets.yaml.example.
+
+audio:
+  channels: 1
+  chunk_duration: 3.0   # seconds per inference window
+  device: null           # null = system default; set to pactl source name or sounddevice index
+  max_queue_size: 20
+
+# ── Active classifiers ────────────────────────────────────────────────────────
+# Remove entries you don't need. 'bee' requires BuzzDetect (see install.sh).
+# 'bat' requires an ultrasonic microphone (≥192 kHz) — expensive hardware.
+classifiers:
+  active:
+    - bird
+    - bee
+  # Optional: assign a specific microphone to each classifier (pactl source name).
+  # Leave null to use the global audio.device setting.
+  devices:
+    bat: null
+    bee: null
+    bird: null
+    insect: null
+    soil: null
+
+# ── Bird detection (BirdNET — 6000+ species) ─────────────────────────────────
+bird:
+  latitude: null          # set to your recording location for species-range filtering
+  longitude: null         # e.g. latitude: 51.86  longitude: -1.34
+  min_confidence: 0.35
+  sample_rate: 48000
+
+# ── Bee detection (BuzzDetect) ────────────────────────────────────────────────
+bee:
+  include_trill: false    # also detect stridulating insects (higher false-positive rate)
+  logit_threshold: -1.45  # lower = more detections; -1.45 ≈ 90% specificity
+
+# ── Bat detection (BatDetect2 — 17 UK/EU species) ────────────────────────────
+bat:
+  capture_rate: 256000
+  min_class_confidence: 0.4
+  min_det_confidence: 0.5
+  silence_threshold: 0.0001
+
+# ── Insect / orthoptera (OrthopterOSS / OpenSoundscape) ───────────────────────
+insect:
+  clip_duration: 3.0
+  freq_max_hz: 20000
+  freq_min_hz: 2000
+  min_confidence: 0.5
+  sample_rate: 44100
+
+# ── Soil acoustic index ────────────────────────────────────────────────────────
+soil:
+  aci_scale: 0.5
+  freq_max_hz: 2000
+  freq_min_hz: 50
+  min_confidence: 0.1
+  rms_scale: 0.05
+  sample_rate: 22050
+
+# ── Recording location ────────────────────────────────────────────────────────
+location:
+  latitude: null          # used in detection logs and MQTT payloads
+  longitude: null
+  name: ""                # human-readable site name shown in the web UI
+
+# ── Output ────────────────────────────────────────────────────────────────────
+output:
+  console: true
+  detections_csv: output/detections.csv
+  sessions_csv: output/sessions.csv
+  min_confidence: 0.35    # minimum confidence written to CSV / shown in web UI
+
+# ── Clip library ──────────────────────────────────────────────────────────────
+clips:
+  dir: output/clips
+  max_per_species: 100
+  species_db: output/known_species.json
+
+# ── MQTT (optional — set enabled: true and fill in host/credentials) ──────────
+mqtt:
+  enabled: false
+  host: ""                # e.g. your-broker.emqxsl.com or your own server
+  port: 1883              # 1883 for plain TCP, 8883 for TLS
+  tls: false              # set true when using port 8883 / cloud brokers
+  mode: direct            # 'direct' = Python connects to broker with credentials
+                          # 'bridge' = Python connects to local Mosquitto, which forwards upstream
+  topic_prefix: bioacoustics
+# username and password go in secrets.yaml (never commit credentials)
+
+# ── Scheduled listening windows ───────────────────────────────────────────────
+schedule:
+  timezone: Europe/London   # any tz database name, e.g. America/New_York
+  windows:
+    - name: dawn_chorus
+      anchor: sunrise
+      offset_mins: -30      # start 30 min before sunrise
+      duration_mins: 150
+    - name: morning_song
+      anchor: sunrise
+      offset_mins: 150
+      duration_mins: 60
+    - name: dusk
+      anchor: sunset
+      offset_mins: -60
+      duration_mins: 90
+  adaptive:
+    early_morning:
+      - Common Nightingale
+      - Song Thrush
+    nocturnal:
+      - Tawny Owl
+      - Barn Owl
+      - Little Owl
+      - European Nightjar

@@ -12,3 +12,4 @@ build/
 detections.csv
 .pytest_cache/
 .DS_Store
+output/
