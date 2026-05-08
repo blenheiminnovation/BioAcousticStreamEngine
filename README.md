@@ -466,6 +466,104 @@ The pipeline will automatically set up the correct audio stream and frequency fi
 
 ---
 
+## Training a Custom Insect Classifier
+
+The insect classifier ([insect.py](src/ecoacoustics/classifiers/insect.py)) accepts any [OpenSoundscape](https://opensoundscape.org/) `.model` file. The notebooks in [training/notebooks/](training/notebooks/) walk through the full pipeline — ECOSoundSet audio → labelled clips → trained ResNet18 → deployed in BASE.
+
+### Why a separate environment
+
+The BASE runtime (`.venv`) bundles `tensorflow-cpu` and `batdetect2`, which conflict with the `opensoundscape` + PyTorch stack used for training. A dedicated `.venv-training` keeps both working side-by-side without version conflicts.
+
+### 1. Create the training environment
+
+```bash
+python3 -m venv .venv-training
+.venv-training/bin/pip install --upgrade pip
+.venv-training/bin/pip install \
+    opensoundscape==0.10.2 \
+    librosa \
+    soundfile \
+    scikit-learn \
+    matplotlib \
+    pandas \
+    numpy \
+    ipykernel \
+    jupyter
+```
+
+Register it as a Jupyter kernel (this is what the notebooks call "Python (orthoptera-training)"):
+
+```bash
+.venv-training/bin/python -m ipykernel install \
+    --user \
+    --name orthoptera-training \
+    --display-name "Python (orthoptera-training)"
+```
+
+In VS Code, open any notebook, click the kernel picker in the top-right, and select **Python (orthoptera-training)**.
+
+### 2. Download training datasets
+
+Install `zenodo_get` if not already available:
+
+```bash
+.venv-training/bin/pip install zenodo_get
+```
+
+Then fetch the datasets. **ECOSoundSet** (~125 GB) is the primary source — 200 European Orthoptera species with strong labels. **InsectSet459** (~68 GB) can supplement sparse species.
+
+```bash
+mkdir -p datasets/ecosoundset datasets/insectset459
+
+cd datasets/ecosoundset
+zenodo_get 15043892        # ECOSoundSet — Funosas et al. 2025
+
+cd ../insectset459
+zenodo_get 14056458        # InsectSet459 — Faiss et al. 2025
+
+cd ../..
+```
+
+Downloads can take several hours. Run them in `tmux` or `screen` so they survive a disconnected terminal:
+
+```bash
+tmux new -s datasets
+# run the two zenodo_get commands above, then Ctrl+B D to detach
+```
+
+### 3. Run the notebooks
+
+Open the notebooks in order — each one builds on the last:
+
+| Notebook | What it does |
+|---|---|
+| [`00_verify_setup.ipynb`](training/notebooks/00_verify_setup.ipynb) | Confirm all packages installed; optional WAV file smoke-test |
+| [`01_explore_data.ipynb`](training/notebooks/01_explore_data.ipynb) | Inspect ECOSoundSet, class balance, spectrogram preview |
+| [`02_prepare_labels.ipynb`](training/notebooks/02_prepare_labels.ipynb) | Build OpenSoundscape one-hot train/val/test CSVs |
+| [`03_train_model.ipynb`](training/notebooks/03_train_model.ipynb) | Train ResNet18, evaluate on held-out test set, save model |
+
+The trained model is saved to `models/orthoptera_uk.model`.
+
+### 4. Activate the model in BASE
+
+Edit `config/settings.yaml`:
+
+```yaml
+insect:
+  model_path: "models/orthoptera_uk.model"
+  min_confidence: 0.5
+  clip_duration: 3.0
+
+classifiers:
+  active:
+    - bird
+    - insect   # add this line
+```
+
+Restart BASE — insect detections will appear in the live feed immediately.
+
+---
+
 ## Roadmap
 
 - [x] Bat classifier — BatDetect2, 17 UK/European species (requires ultrasonic microphone ≥192 kHz)
