@@ -1,4 +1,5 @@
 .venv/
+.venv-training/
 __pycache__/
 external/
 config/secrets.yaml
@@ -13,3 +14,6 @@ detections.csv
 .pytest_cache/
 .DS_Store
 output/
+datasets/
+models/*.model
+training/data/

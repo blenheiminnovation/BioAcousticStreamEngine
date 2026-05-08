@@ -1,0 +1,25 @@
+{
+  "version": "0.2.0",
+  "configurations": [
+    {
+      "name": "BASE — Web UI",
+      "type": "python",
+      "request": "launch",
+      "module": "ecoacoustics.main",
+      "args": ["web", "--no-browser"],
+      "cwd": "${workspaceFolder}",
+      "env": {"PYTHONPATH": "${workspaceFolder}/src"},
+      "python": "${workspaceFolder}/.venv/bin/python"
+    },
+    {
+      "name": "BASE — Wake (30 min)",
+      "type": "python",
+      "request": "launch",
+      "module": "ecoacoustics.main",
+      "args": ["wake", "--duration", "30"],
+      "cwd": "${workspaceFolder}",
+      "env": {"PYTHONPATH": "${workspaceFolder}/src"},
+      "python": "${workspaceFolder}/.venv/bin/python"
+    }
+  ]
+}
