@@ -25,7 +25,7 @@ classifiers:
     bat: null
     bee: null
     bird: null
-    insect: 52
+    insect: null
     soil: null
 clips:
   dir: output/clips

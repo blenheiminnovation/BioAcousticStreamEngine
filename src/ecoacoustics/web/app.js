@@ -181,6 +181,8 @@ const ws = {
       if (tabsEl) tabsEl.outerHTML = renderTabs('feed-tabs');
     } else if (data.type === 'audio_level') {
       updateVuMeter(data.db);
+    } else if (data.type === 'pipeline_stopped') {
+      resetVuMeter();
     }
   },
 };
@@ -371,6 +373,8 @@ async function stopDevice(deviceKey, btn) {
   }
 }
 
+let _vuResetTimer = null;
+
 function updateVuMeter(db) {
   const bar = document.getElementById('vu-bar');
   const label = document.getElementById('vu-db');
@@ -380,6 +384,19 @@ function updateVuMeter(db) {
   bar.style.width = pct + '%';
   bar.className = 'vu-bar' + (pct > 85 ? ' high' : pct > 65 ? ' mid' : '');
   label.textContent = db.toFixed(1) + ' dB';
+  // Reset to "no signal" if no update arrives within 6 seconds
+  if (_vuResetTimer) clearTimeout(_vuResetTimer);
+  _vuResetTimer = setTimeout(resetVuMeter, 6000);
+}
+
+function resetVuMeter() {
+  if (_vuResetTimer) { clearTimeout(_vuResetTimer); _vuResetTimer = null; }
+  const bar = document.getElementById('vu-bar');
+  const label = document.getElementById('vu-db');
+  if (!bar || !label) return;
+  bar.style.width = '0%';
+  bar.className = 'vu-bar';
+  label.innerHTML = '<span class="vu-no-signal">no signal</span>';
 }
 
 function prependDetection(det) {

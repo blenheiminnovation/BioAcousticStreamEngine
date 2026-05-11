@@ -70,7 +70,8 @@ class PipelineManager:
 
     def start_wake(self, duration_minutes: Optional[int] = None) -> bool:
         with self._lock:
-            if self._state != "idle":
+            # Guard against stale "idle" state while the previous thread winds down
+            if self._state != "idle" or (self._thread and self._thread.is_alive()):
                 return False
             self._state = "listening"
             self._window = "manual"
@@ -86,7 +87,7 @@ class PipelineManager:
 
     def start_schedule(self) -> bool:
         with self._lock:
-            if self._state != "idle":
+            if self._state != "idle" or (self._thread and self._thread.is_alive()):
                 return False
             self._state = "scheduled"
             self._started_at = datetime.now().isoformat()
@@ -130,6 +131,7 @@ class PipelineManager:
                 self._state = "idle"
                 self._window = None
                 self._started_at = None
+            self._broadcast_pipeline_stopped()
 
     def _run_schedule(self) -> None:
         from ecoacoustics.pipeline import Pipeline
@@ -181,10 +183,23 @@ class PipelineManager:
                 self._window = None
                 self._next_window = None
                 self._started_at = None
+            self._broadcast_pipeline_stopped()
 
     # ------------------------------------------------------------------
     # Detection bridge: sync thread → async WebSocket queue
     # ------------------------------------------------------------------
+
+    def _broadcast_pipeline_stopped(self) -> None:
+        """Tell the frontend to reset the VU meter when this pipeline finishes."""
+        if not self._loop or not self._broadcast_queue:
+            return
+        try:
+            asyncio.run_coroutine_threadsafe(
+                self._broadcast_queue.put({"type": "pipeline_stopped", "device_name": self._device_name}),
+                self._loop,
+            )
+        except Exception:
+            pass
 
     def _on_level(self, db: float) -> None:
         if not self._loop or not self._broadcast_queue:

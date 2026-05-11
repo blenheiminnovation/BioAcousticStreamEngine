@@ -79,23 +79,43 @@ class AudioCapture:
 
         self._dropped: int = 0          # chunks discarded when queue was full
         self._last_chunk_time: float = 0.0
+        self._started_at: float = 0.0   # unix time when stream was last opened
         self._overflow_count: int = 0   # sounddevice input overflow events
+        self._chunk_start_time: float = 0.0  # wall time when current chunk accumulation began
 
     # ------------------------------------------------------------------
     # Public API
     # ------------------------------------------------------------------
 
     def start(self) -> None:
-        """Open the sounddevice input stream and begin capturing audio."""
+        """Open the sounddevice input stream, retrying up to 3 times on transient errors."""
         import sounddevice as sd
-        self._stream = sd.InputStream(
-            samplerate=self.sample_rate,
-            channels=self.channels,
-            dtype="float32",
-            device=self.device,
-            callback=self._callback,
-        )
-        self._stream.start()
+        last_exc: Optional[Exception] = None
+        for attempt in range(3):
+            try:
+                self._stream = sd.InputStream(
+                    samplerate=self.sample_rate,
+                    channels=self.channels,
+                    dtype="float32",
+                    device=self.device,
+                    callback=self._callback,
+                )
+                self._stream.start()
+                self._last_chunk_time = 0.0    # reset so watchdog measures from now
+                self._chunk_start_time = 0.0   # will be set on first callback
+                self._started_at = time.time()
+                return
+            except Exception as exc:
+                last_exc = exc
+                if self._stream:
+                    try:
+                        self._stream.close()
+                    except Exception:
+                        pass
+                    self._stream = None
+                if attempt < 2:
+                    time.sleep(0.5 * (attempt + 1))
+        raise last_exc  # type: ignore[misc]
 
     def stop(self) -> None:
         """Stop and close the audio stream, ignoring any errors on close."""
@@ -106,6 +126,7 @@ class AudioCapture:
             except Exception:
                 pass
             self._stream = None
+        self._started_at = 0.0
 
     def restart(self) -> None:
         """Stop the stream, drain stale queued audio, then restart.
@@ -147,6 +168,16 @@ class AudioCapture:
     # ------------------------------------------------------------------
 
     @property
+    def is_active(self) -> bool:
+        """True if the underlying sounddevice stream is open and running."""
+        return self._stream is not None and self._stream.active
+
+    @property
+    def started_at(self) -> float:
+        """Unix timestamp when the stream was last opened; 0 before first start."""
+        return self._started_at
+
+    @property
     def queue_depth(self) -> int:
         """Current number of chunks waiting in the queue."""
         return self._queue.qsize()
@@ -179,13 +210,22 @@ class AudioCapture:
         """Accumulate incoming PCM frames and emit complete chunks to the queue.
 
         Runs in the sounddevice audio thread — must not block.
+
+        chunk.timestamp is the wall-clock time of the FIRST sample in the chunk
+        (i.e. when the recording window opened), so detections are logged against
+        when the animal called, not when the classifier finished processing.
         """
         if status.input_overflow:
             self._overflow_count += 1
 
         mono = indata[:, 0] if indata.ndim > 1 else indata.ravel()
+        now = time.time()
 
         with self._lock:
+            if len(self._buffer) == 0:
+                # First samples of a new chunk — record the wall time of this moment.
+                self._chunk_start_time = now
+
             self._buffer = np.concatenate([self._buffer, mono])
             while len(self._buffer) >= self.chunk_samples:
                 chunk_data = self._buffer[: self.chunk_samples].copy()
@@ -193,11 +233,14 @@ class AudioCapture:
                 chunk = AudioChunk(
                     data=chunk_data,
                     sample_rate=self.sample_rate,
-                    timestamp=time.time(),
+                    timestamp=self._chunk_start_time,
                 )
+                # Advance start time for any back-to-back chunks extracted in
+                # the same callback (rare, but possible on large frame sizes).
+                self._chunk_start_time += self.chunk_samples / self.sample_rate
                 try:
                     self._queue.put_nowait(chunk)
-                    self._last_chunk_time = chunk.timestamp
+                    self._last_chunk_time = now  # wall clock for watchdog stale check
                 except queue.Full:
                     # Queue is full — discard rather than blocking the callback,
                     # which would cause an audio dropout on the input stream.

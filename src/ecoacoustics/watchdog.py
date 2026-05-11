@@ -131,16 +131,24 @@ class Watchdog(threading.Thread):
             self._last_dropped[sr] = new_dropped
 
     def _check_streams(self) -> None:
-        """Restart any audio stream that has been silent longer than STREAM_STALE_SECS."""
+        """Restart any audio stream that has been silent longer than STREAM_STALE_SECS.
+
+        Also catches streams that opened but never delivered a single chunk (e.g. wrong
+        device selected, suspended PipeWire source) by measuring from the stream start
+        time when last_chunk_time is still 0.
+        """
         now = time.time()
         for sr, capture in self._captures.items():
             last = capture.last_chunk_time
-            if last == 0.0:
-                continue  # stream has not produced any chunks yet
-            stale = now - last
+            # Use start time as reference when no chunk has arrived yet
+            reference = last if last > 0.0 else capture.started_at
+            if reference == 0.0:
+                continue  # stream hasn't been opened yet
+            stale = now - reference
             if stale > STREAM_STALE_SECS:
+                reason = "no chunks ever received" if last == 0.0 else f"silent for {stale:.0f}s"
                 _console.print(
-                    f"[yellow][watchdog] {sr}Hz stream silent for {stale:.0f}s "
+                    f"[yellow][watchdog] {sr}Hz stream stale ({reason}) "
                     f"— attempting restart[/yellow]"
                 )
                 try:
