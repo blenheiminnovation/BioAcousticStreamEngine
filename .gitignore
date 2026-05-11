@@ -15,5 +15,5 @@ detections.csv
 .DS_Store
 output/
 datasets/
-models/*.model
+models/orthoptera_checkpoints/
 training/data/
