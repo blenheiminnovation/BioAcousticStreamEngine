@@ -576,7 +576,7 @@ Restart BASE — insect detections will appear in the live feed immediately.
 - [x] MQTT live feed — direct and bridge connection modes, configurable via UI
 - [x] Multi-microphone support — per-classifier device assignment
 - [x] Bee buzz classifier — BuzzDetect v1.0.1 (YAMNet, 16 kHz; detects insect flight buzz)
-- [ ] Insect classifier — grasshoppers and bush crickets via OrthopterOSS (wired and ready, awaiting model release)
+- [x] Insect classifier — grasshoppers and bush crickets; ResNet18 v1 trained by Blenheim Palace Innovation on InsectSet459 + ECOSoundSet, 8 UK species
 - [x] Soil Acoustic Index (SAI) — beta implementation using ACI + spectral entropy
 - [x] Species activity heatmaps by time of day and season
 
