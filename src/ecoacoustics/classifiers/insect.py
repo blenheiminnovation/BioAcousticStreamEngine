@@ -163,8 +163,12 @@ class InsectClassifier(BaseClassifier):
 
             sf.write(tmp_path, audio, self.sample_rate, subtype="PCM_16")
 
+            # split_files_into_clips=False: treat the whole chunk as one sample so
+            # the model's preprocessor (extend=True) handles any length difference,
+            # rather than the file-splitter producing zero clips for sub-4s chunks.
             scores_df = self._model.predict(
                 [tmp_path],
+                split_files_into_clips=False,
                 clip_overlap_fraction=0,
                 batch_size=1,
                 activation_layer="sigmoid",
@@ -178,12 +182,14 @@ class InsectClassifier(BaseClassifier):
             row = scores_df.iloc[0]
             for species, score in row.items():
                 if float(score) >= self._min_confidence:
+                    common = _COMMON_NAMES.get(str(species), str(species))
                     detections.append(Detection(
-                        label=species,
+                        label=common,
                         confidence=round(float(score), 4),
                         classifier=self.name,
                         timestamp=chunk.timestamp,
                         metadata={
+                            "scientific_name": str(species),
                             "model": str(Path(self._model_path).name),
                             "group": _orthoptera_group(str(species)),
                         },
@@ -202,6 +208,22 @@ class InsectClassifier(BaseClassifier):
 
     def cleanup(self) -> None:
         self._model = None
+
+
+_COMMON_NAMES: dict[str, str] = {
+    "Chorthippus brunneus brunneus":          "Field Grasshopper",
+    "Pseudochorthippus parallelus parallelus": "Meadow Grasshopper",
+    "Omocestus viridulus":                    "Common Green Grasshopper",
+    "Tettigonia viridissima":                 "Great Green Bush-cricket",
+    "Roeseliana roeselii":                    "Roesel's Bush-cricket",
+    "Pholidoptera griseoaptera":              "Dark Bush-cricket",
+    "Leptophyes punctatissima":               "Speckled Bush-cricket",
+    "Gryllus campestris":                     "Field Cricket",
+    # synonyms that may appear depending on model training
+    "Chorthippus parallelus":                 "Meadow Grasshopper",
+    "Chorthippus albomarginatus":             "Lesser Marsh Grasshopper",
+    "Meconema thalassinum":                   "Oak Bush-cricket",
+}
 
 
 def _orthoptera_group(species: str) -> str:

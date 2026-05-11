@@ -39,8 +39,11 @@ def get_or_create_pipeline(device_key: str, device_index=None, device_name: str 
 
 @asynccontextmanager
 async def lifespan(app: FastAPI):
-    # Ensure the default pipeline manager exists and has the event loop
     loop = asyncio.get_running_loop()
+    # Store in state so sync route handlers can wire new pipelines without needing
+    # asyncio.get_running_loop() (which raises RuntimeError outside async context).
+    state.event_loop = loop
+    state.broadcast_queue = _broadcast_queue
     mgr = get_or_create_pipeline("default", device_index=None, device_name="Default")
     mgr.set_async_context(loop, _broadcast_queue)
     task = asyncio.create_task(_broadcast_loop())

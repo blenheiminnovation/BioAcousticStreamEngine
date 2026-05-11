@@ -20,16 +20,11 @@ except PackageNotFoundError:
 
 def _ensure_pipeline(device_key: str, device_index=None, device_name: str = "Default"):
     """Return an existing pipeline manager, creating and wiring one if needed."""
-    from ecoacoustics.api.app import get_or_create_pipeline, _broadcast_queue
-    import asyncio
+    from ecoacoustics.api.app import get_or_create_pipeline
 
     mgr = get_or_create_pipeline(device_key, device_index, device_name)
-    if mgr._broadcast_queue is None:
-        try:
-            loop = asyncio.get_running_loop()
-            mgr.set_async_context(loop, _broadcast_queue)
-        except RuntimeError:
-            pass
+    if mgr._broadcast_queue is None and state.event_loop is not None:
+        mgr.set_async_context(state.event_loop, state.broadcast_queue)
     return mgr
 
 
