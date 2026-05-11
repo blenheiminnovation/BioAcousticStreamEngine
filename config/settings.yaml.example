@@ -52,13 +52,33 @@ insect:
   sample_rate: 44100
 
 # ── Soil acoustic index ────────────────────────────────────────────────────────
+# v2 primary score: NDSI × bio-band RMS, with mains-harmonic notch cascade.
+# v1 (RMS + ACI + entropy) is still computed and reported as ``sai_v1`` in
+# metadata for trend continuity against historical detections. Set
+# ``ndsi.enabled: false`` to make v1 the primary score again.
 soil:
+  # v1 (legacy, retained for trend continuity)
   aci_scale: 0.5
   freq_max_hz: 2000
   freq_min_hz: 50
   min_confidence: 0.1
   rms_scale: 0.05
   sample_rate: 22050
+  # v2 (primary): NDSI × bio-band RMS × transient gate, mains notched.
+  # The transient gate is what rejects aircraft, helicopters and other sustained
+  # broadband sources — they have low temporal crest in the bio band (continuous),
+  # whereas worm rasps and soil arthropods are sharp bursts (high crest).
+  bio_rms_scale: 0.01       # RMS in the bio band that maps to a 1.0 contribution
+  ndsi:
+    enabled: true
+    anthro_hz: [50, 300]    # surface seismic noise: footsteps, traffic, jet rumble
+    bio_hz:    [500, 2000]  # earthworm rasps, soil arthropods
+    mains_hz:  [50, 100, 150, 200]
+    mains_q:   30
+    transient_gate:
+      low:    1.5           # crest <= this -> gate fully closed (continuous noise)
+      high:   4.0           # crest >= this -> gate fully open  (bursty biology)
+      win_ms: 30            # short-time envelope window (~ worm-rasp duration)
 
 # ── Recording location ────────────────────────────────────────────────────────
 location:

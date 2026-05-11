@@ -24,8 +24,10 @@ def _make_chunk(sr: int = 22050, duration: float = 3.0, rms: float = 0.05) -> Au
 
 
 def test_soil_classifier_detects_above_threshold():
-    """SoilClassifier should return a detection when RMS exceeds the energy threshold."""
-    clf = SoilClassifier({"min_confidence": 0.4, "energy_threshold": 0.01})
+    """v1 fallback: SoilClassifier with NDSI disabled should fire on plain
+    audio energy. This documents the legacy code path used when
+    ``ndsi.enabled: false`` in settings.yaml."""
+    clf = SoilClassifier({"min_confidence": 0.4, "ndsi": {"enabled": False}})
     chunk = _make_chunk(rms=0.1)
     detections = clf.classify(chunk)
     assert len(detections) == 1
@@ -34,10 +36,88 @@ def test_soil_classifier_detects_above_threshold():
 
 
 def test_soil_classifier_silent_audio():
-    """SoilClassifier should return no detections for near-silent audio."""
-    clf = SoilClassifier({"min_confidence": 0.4, "energy_threshold": 0.01})
+    """SoilClassifier should return no detections for near-silent audio.
+
+    Holds for both v1 (low RMS) and v2 (zero bio_rms → zero score)."""
+    clf = SoilClassifier({"min_confidence": 0.4})
     chunk = _make_chunk(rms=0.0001)
     assert clf.classify(chunk) == []
+
+
+def test_soil_v2_rejects_low_frequency_rumble():
+    """v2 SAI should suppress traffic/footstep rumble even at high RMS.
+
+    A pure 50–150 Hz signal mimics traffic, footsteps, aircraft, HVAC. NDSI
+    must drive sai_v2 toward zero so the rod doesn't report soil activity
+    when only surface seismic noise is present.
+    """
+    sr = 22050
+    t = np.arange(int(sr * 3.0)) / sr
+    rumble = (np.sin(2 * np.pi * 45 * t)
+              + 0.7 * np.sin(2 * np.pi * 80 * t)
+              + 0.4 * np.sin(2 * np.pi * 130 * t)) * 0.05
+    chunk = AudioChunk(data=rumble.astype(np.float32), sample_rate=sr, timestamp=0.0)
+
+    clf = SoilClassifier({"min_confidence": 0.0})
+    dets = clf.classify(chunk)
+    assert dets, "min_confidence=0 should always emit a Detection so we can read v2"
+    meta = dets[0].metadata
+    assert meta["ndsi"] < -0.5, f"expected strongly anthropogenic NDSI, got {meta['ndsi']}"
+    assert meta["sai_v2"] < 0.05, f"v2 should suppress pure rumble, got {meta['sai_v2']}"
+
+
+def test_soil_v2_flags_worm_band_activity():
+    """v2 SAI should reward energy in the 500-2000 Hz bio band when the
+    anthropogenic band is quiet."""
+    sr = 22050
+    rng = np.random.default_rng(0)
+    duration = 3.0
+    n = int(sr * duration)
+    audio = np.zeros(n)
+    # 20 short tone bursts in the worm-rasp range
+    for onset in rng.uniform(0, duration, 20):
+        i = int(onset * sr)
+        burst_len = int(0.03 * sr)
+        env = np.exp(-np.arange(min(burst_len, n - i)) / (sr * 0.005))
+        carrier = np.sin(2 * np.pi * rng.uniform(700, 1500)
+                         * np.arange(len(env)) / sr)
+        audio[i:i + len(env)] += carrier * env * 0.05
+    chunk = AudioChunk(data=audio.astype(np.float32), sample_rate=sr, timestamp=0.0)
+
+    clf = SoilClassifier({"min_confidence": 0.0})
+    dets = clf.classify(chunk)
+    assert dets
+    meta = dets[0].metadata
+    assert meta["ndsi"] > 0.5, f"expected strongly biological NDSI, got {meta['ndsi']}"
+    assert meta["sai_v2"] > 0.1, f"v2 should flag worm-band activity, got {meta['sai_v2']}"
+
+
+def test_soil_v2_rejects_propeller_plane():
+    """v2 SAI must reject a propeller plane / helicopter overflight.
+
+    Propeller harmonics extend into the bio band (80 Hz × 7 = 560 Hz, etc.)
+    so band-power split alone is not enough. The transient gate notices
+    that the signal is temporally continuous (low crest in the bio band)
+    and forces the score to zero.
+    """
+    sr = 22050
+    t = np.arange(int(sr * 3.0)) / sr
+    # Simulate a propeller plane: 80 Hz fundamental + 25 harmonics
+    prop = np.zeros_like(t)
+    for n in range(1, 26):
+        prop += np.sin(2 * np.pi * 80 * n * t) * (0.05 / n)
+    chunk = AudioChunk(data=prop.astype(np.float32), sample_rate=sr, timestamp=0.0)
+
+    clf = SoilClassifier({"min_confidence": 0.0})
+    dets = clf.classify(chunk)
+    assert dets
+    meta = dets[0].metadata
+    assert meta["bio_band_crest"] < 2.0, (
+        f"propeller plane should be temporally continuous; "
+        f"crest = {meta['bio_band_crest']}"
+    )
+    assert meta["transient_gate"] < 0.2, f"gate should be closed; got {meta['transient_gate']}"
+    assert meta["sai_v2"] < 0.05, f"v2 should reject prop plane; got {meta['sai_v2']}"
 
 
 def test_audio_processor_bandpass():
