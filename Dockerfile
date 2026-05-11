@@ -63,7 +63,11 @@ RUN mkdir -p external \
 RUN mkdir -p output/clips
 
 COPY docker-entrypoint.sh /usr/local/bin/docker-entrypoint.sh
-RUN chmod +x /usr/local/bin/docker-entrypoint.sh
+# Strip any CR characters that Windows git checkouts may have introduced —
+# Linux refuses to run a shebang with CRLF (/usr/bin/env: 'bash\r': No such
+# file or directory). Defensive; works even if .gitattributes is missing.
+RUN sed -i 's/\r$//' /usr/local/bin/docker-entrypoint.sh \
+    && chmod +x /usr/local/bin/docker-entrypoint.sh
 
 EXPOSE 8000
 

@@ -1,0 +1,19 @@
+# Always check out shell scripts with LF line endings, regardless of the
+# user's core.autocrlf setting. Linux containers and CI runners reject
+# CRLF in shebang lines with "/usr/bin/env: 'bash\r': No such file".
+*.sh           text eol=lf
+Dockerfile     text eol=lf
+docker-compose.yml text eol=lf
+.dockerignore  text eol=lf
+
+# Treat these as binary so git won't try to "fix" them in any way
+*.png          binary
+*.jpg          binary
+*.jpeg         binary
+*.gif          binary
+*.wav          binary
+*.flac         binary
+*.model        binary
+*.pt           binary
+*.pth          binary
+*.tflite       binary
