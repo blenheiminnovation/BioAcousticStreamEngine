@@ -38,6 +38,7 @@ insect:
   min_confidence: 0.5
   model_path: models/orthoptera_uk.model
   sample_rate: 44100
+  silence_threshold: 0.001
 location:
   latitude: 51.8403
   longitude: -1.3625

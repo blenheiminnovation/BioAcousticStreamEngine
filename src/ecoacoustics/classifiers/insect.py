@@ -82,6 +82,7 @@ class InsectClassifier(BaseClassifier):
 
     def __init__(self, config: dict[str, Any]):
         self._min_confidence: float = config.get("min_confidence", 0.5)
+        self._silence_threshold: float = config.get("silence_threshold", 0.001)
         self._model_path: Optional[str] = config.get("model_path")
         self._clip_duration: float = config.get("clip_duration", 3.0)
         self._model = None
@@ -155,6 +156,11 @@ class InsectClassifier(BaseClassifier):
             return []
 
         audio = chunk.data.astype(np.float32)
+
+        # Skip inference on near-silent chunks — OpenSoundscape is expensive
+        if np.sqrt(np.mean(audio ** 2)) < self._silence_threshold:
+            return []
+
         detections: list[Detection] = []
 
         try:
