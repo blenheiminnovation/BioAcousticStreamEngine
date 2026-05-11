@@ -118,7 +118,12 @@ class AudioCapture:
         raise last_exc  # type: ignore[misc]
 
     def stop(self) -> None:
-        """Stop and close the audio stream, ignoring any errors on close."""
+        """Stop and close the audio stream, draining any unprocessed chunks.
+
+        Draining ensures that if this capture is reused (or a new pipeline
+        starts shortly after), no stale audio from the previous session
+        lingers in the queue and gets processed out of context.
+        """
         if self._stream:
             try:
                 self._stream.stop()
@@ -126,6 +131,18 @@ class AudioCapture:
             except Exception:
                 pass
             self._stream = None
+        drained = 0
+        while not self._queue.empty():
+            try:
+                self._queue.get_nowait()
+                drained += 1
+            except queue.Empty:
+                break
+        if drained:
+            import logging
+            logging.getLogger(__name__).debug(
+                "AudioCapture.stop: drained %d stale chunks from queue", drained
+            )
         self._started_at = 0.0
 
     def restart(self) -> None:
@@ -133,14 +150,9 @@ class AudioCapture:
 
         Called by the Watchdog when the stream appears to have gone silent
         unexpectedly (e.g. USB microphone briefly disconnected).
+        stop() now handles queue draining, so we just reset the buffer and reopen.
         """
         self.stop()
-        # Drain stale audio so the classifier doesn't process old chunks
-        while not self._queue.empty():
-            try:
-                self._queue.get_nowait()
-            except queue.Empty:
-                break
         with self._lock:
             self._buffer = np.zeros(0, dtype=np.float32)
         time.sleep(1.0)

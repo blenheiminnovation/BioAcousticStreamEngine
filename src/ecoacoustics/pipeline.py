@@ -237,9 +237,21 @@ class Pipeline:
         processor = self._processors[clf.name]
         consecutive_errors = 0
 
+        # Chunks older than this are skipped — prevents a backed-up queue from
+        # replaying stale audio long after it was captured.
+        max_chunk_age: float = self._cfg.get("audio", {}).get("max_chunk_age_seconds", 30.0)
+
         while not self._stop_event.is_set():
             chunk = capture.get_chunk(timeout=1.0)
             if chunk is None:
+                continue
+
+            age = time.time() - chunk.timestamp
+            if age > max_chunk_age:
+                _console.print(
+                    f"[yellow][{clf.name}] skipping stale chunk "
+                    f"({age:.0f}s old, max={max_chunk_age:.0f}s)[/yellow]"
+                )
                 continue
 
             if self._level_callback:
