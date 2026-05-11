@@ -748,6 +748,22 @@ Both datasets work with OpenSoundscape's CNN training pipeline. Any `.model` fil
 
 ---
 
+### OpenSoundscape
+
+The insect classifier is built on **OpenSoundscape**, an open-source bioacoustics framework developed by the [Kitzes Lab](https://www.kitzeslab.org/) at the University of Pittsburgh.
+
+> Lapp, S., Rhinehart, T., Freeland, M., Alvarez, J., Diaz, J., Lin, T-Y., Kitzes, J. (2023).  
+> **OpenSoundscape: An open-source bioacoustics analysis package for Python.**  
+> *Methods in Ecology and Evolution*, 14(11), 2686–2698.  
+> https://doi.org/10.1111/2041-210X.14196
+
+- Website: [opensoundscape.org](https://opensoundscape.org)
+- GitHub: [github.com/kitzeslab/opensoundscape](https://github.com/kitzeslab/opensoundscape)
+- Provides the CNN model format, training pipeline, and inference engine used to train and run the Orthoptera classifier
+- The `orthoptera_uk.model` shipped with BASE was trained using OpenSoundscape on ECOSoundSet data
+
+---
+
 ### Inspiration
 
 This project was inspired by the work and vision of **Dr. Curt Lamberth**, whose research into acoustic biodiversity monitoring provided the founding ideas behind this system.
