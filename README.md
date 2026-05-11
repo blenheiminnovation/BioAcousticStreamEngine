@@ -8,6 +8,21 @@ This project was born from a belief that technology can bring people closer to t
 
 ---
 
+## Screenshots
+
+<!-- Drop screenshots into docs/screenshots/ using the filenames below.
+     See docs/screenshots/README.md for size and format guidelines. -->
+
+| Dashboard | Schedule |
+|---|---|
+| ![Dashboard — live detection feed, VU meter, per-device start/stop](docs/screenshots/dashboard.png) | ![Schedule — listening windows and classifier-to-device assignment](docs/screenshots/schedule.png) |
+
+| Clips | Reports | Settings |
+|---|---|---|
+| ![Clips — saved audio clips browseable per species](docs/screenshots/clips.png) | ![Reports — daily summaries, species filtering, CSV download](docs/screenshots/reports.png) | ![Settings — recording location, MQTT broker, classifier device assignment](docs/screenshots/settings.png) |
+
+---
+
 ## Features
 
 - **Live microphone streaming** — continuous audio capture with configurable chunk size; multiple concurrent microphones supported, each assigned to a different classifier
