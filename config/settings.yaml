@@ -20,21 +20,23 @@ classifiers:
   active:
   - bird
   - bee
+  - insect
   devices:
     bat: null
     bee: null
     bird: null
-    insect: null
+    insect: 52
     soil: null
 clips:
   dir: output/clips
   max_per_species: 100
   species_db: output/known_species.json
 insect:
-  clip_duration: 3.0
+  clip_duration: 4.0
   freq_max_hz: 20000
   freq_min_hz: 2000
   min_confidence: 0.5
+  model_path: models/orthoptera_uk.model
   sample_rate: 44100
 location:
   latitude: 51.8403

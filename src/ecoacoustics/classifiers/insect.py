@@ -165,10 +165,9 @@ class InsectClassifier(BaseClassifier):
 
             scores_df = self._model.predict(
                 [tmp_path],
-                clip_duration=self._clip_duration,
-                overlap_fraction=0,
+                clip_overlap_fraction=0,
                 batch_size=1,
-                activation_layer="softmax",
+                activation_layer="sigmoid",
                 num_workers=0,
             )
 
