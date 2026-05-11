@@ -435,7 +435,7 @@ Times shift daily with sunrise/sunset. Run `status` to see exact times for today
 │   │   ├── bird.py                 # BirdNET via birdnetlib (active)
 │   │   ├── bat.py                  # BatDetect2 — 17 UK/European species
 │   │   ├── insect.py               # Orthoptera — wired for OrthopterOSS / OpenSoundscape
-│   │   └── soil.py                 # Energy + spectral centroid baseline
+│   │   └── soil.py                 # Soil Acoustic Index v2 — NDSI + transient gate
 │   ├── output/
 │   │   ├── logger.py               # Console display + CSV writing
 │   │   └── mqtt_publisher.py       # Publishes detections to MQTT broker
@@ -577,7 +577,7 @@ Restart BASE — insect detections will appear in the live feed immediately.
 - [x] Multi-microphone support — per-classifier device assignment
 - [x] Bee buzz classifier — BuzzDetect v1.0.1 (YAMNet, 16 kHz; detects insect flight buzz)
 - [x] Insect classifier — grasshoppers and bush crickets; ResNet18 v1 trained by Blenheim Palace Innovation on InsectSet459 + ECOSoundSet, 8 UK species
-- [x] Soil Acoustic Index (SAI) — beta implementation using ACI + spectral entropy
+- [x] Soil Acoustic Index (SAI v2) — Blenheim Innovation; NDSI + bio-band RMS + transient gate, rejects traffic rumble, mains hum, propeller and helicopter noise
 - [x] Species activity heatmaps by time of day and season
 
 ---
@@ -761,6 +761,28 @@ The insect classifier is built on **OpenSoundscape**, an open-source bioacoustic
 - GitHub: [github.com/kitzeslab/opensoundscape](https://github.com/kitzeslab/opensoundscape)
 - Provides the CNN model format, training pipeline, and inference engine used to train and run the Orthoptera classifier
 - The `orthoptera_uk.model` shipped with BASE was trained using OpenSoundscape on ECOSoundSet data
+
+---
+
+### Soil Acoustic Index (SAI)
+
+The Soil Acoustic Index is original research and engineering by the **Blenheim Palace Innovation Team**. Unlike the bird, bat, insect and bee classifiers, the soil pipeline does not wrap a pre-trained model — it is a signal-processing chain designed and tuned in-house against the project's own carbon-fibre probe hardware.
+
+**Probe hardware** — a carbon-fibre rod sunk 20–30 cm into the ground, with a contact microphone on the surface end. The rod conducts sub-surface vibration (earthworm rasps, soil arthropods, root activity) up to the mic. This pickup is also a very sensitive seismic coupler for unwanted noise: footsteps, traffic, aircraft rumble, HVAC, and 50 Hz mains. The classifier's job is therefore not just to measure energy but to *discriminate* biological energy from anthropogenic interference.
+
+**SAI v2** (May 2026) combines three independent gates that a signal must pass before it is reported as soil activity:
+
+- **NDSI** *(Normalised Difference Soundscape Index)* — the ratio of biological-band power (500–2000 Hz) to anthropogenic-band power (50–300 Hz). After Pijanowski et al. (2011). Strongly negative for distant jets, traffic rumble, footsteps, deep HVAC; strongly positive for biology.
+- **Bio-band RMS** — gates true silence to zero so the classifier cannot fire on a quiet channel.
+- **Transient gate** — crest factor of the bio-band envelope. Continuous broadband sources (propeller planes, helicopters, sustained machinery) score near zero here even when their harmonic series bleeds up into the biological band, so they are suppressed too.
+
+`SAI_v2 = NDSI₀₁ × bio_rms_norm × transient_gate`
+
+The multiplicative form means a signal must be (a) audible in the bio band, (b) biological in spectral balance, and (c) bursty in time to score. Any one of those failing collapses the score toward zero. A cascade of IIR notches at 50, 100, 150 and 200 Hz removes UK mains contamination before any of the above is computed.
+
+The v1 metrics (RMS + Acoustic Complexity Index after Pieretti et al. 2011, plus spectral entropy) are still computed and surfaced in detection metadata as `sai_v1` so longitudinal comparisons against historical detections.csv rows remain meaningful. Setting `soil.ndsi.enabled: false` in `config/settings.yaml` makes v1 the primary score again.
+
+> Thresholds are signal-processing-derived and not yet calibrated against labelled probe recordings. Treat absolute scores as indicative; relative changes across time on a single probe are the reliable signal.
 
 ---
 
