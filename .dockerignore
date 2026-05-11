@@ -1,0 +1,30 @@
+.git
+.github
+.venv
+.venv-training
+.vscode
+.idea
+__pycache__
+**/__pycache__
+*.py[cod]
+*.egg-info
+dist
+build
+.eggs
+.pytest_cache
+.DS_Store
+
+# Local data — should never bake into the image
+output
+datasets
+external
+training/data
+models/orthoptera_checkpoints
+
+# User-specific config (will be seeded from .example by entrypoint)
+config/secrets.yaml
+config/settings.yaml
+
+# Dev-only
+bioacoustic-stream-engine.desktop
+install.sh

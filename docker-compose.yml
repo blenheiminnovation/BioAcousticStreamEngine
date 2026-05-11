@@ -1,0 +1,25 @@
+services:
+  base:
+    image: bioacoustic-stream-engine:latest
+    build:
+      context: .
+      dockerfile: Dockerfile
+    container_name: base
+    ports:
+      - "8000:8000"
+    volumes:
+      # Host-editable config — first run seeds these from the .example templates.
+      - ./config:/app/config
+      # Detections, sessions, clips library — persisted on the host.
+      - ./output:/app/output
+      # BuzzDetect / BirdNET / BatDetect2 model caches survive container rebuilds.
+      - model-cache:/root/.cache
+    restart: unless-stopped
+    # Live mic capture is disabled in this image — Docker Desktop on Windows
+    # cannot share sound devices with containers without a PulseAudio TCP bridge.
+    # To attempt that, uncomment and adjust:
+    # environment:
+    #   PULSE_SERVER: tcp:host.docker.internal:4713
+
+volumes:
+  model-cache:
