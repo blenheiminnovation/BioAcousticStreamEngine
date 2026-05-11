@@ -10,16 +10,13 @@ This project was born from a belief that technology can bring people closer to t
 
 ## Screenshots
 
-<!-- Drop screenshots into docs/screenshots/ using the filenames below.
-     See docs/screenshots/README.md for size and format guidelines. -->
-
-| Dashboard | Schedule |
+| Recording & Spectrogram | Schedule & Mic Selection |
 |---|---|
-| ![Dashboard — live detection feed, VU meter, per-device start/stop](docs/screenshots/dashboard.png) | ![Schedule — listening windows and classifier-to-device assignment](docs/screenshots/schedule.png) |
+| ![Recording & Spectrogram — live capture and waterfall view](docs/screenshots/Recording%20Spectogram.png) | ![Schedule & Mic Selection — listening windows and classifier-to-device assignment](docs/screenshots/Schedule%20and%20Mic%20Selection.png) |
 
-| Clips | Reports | Settings |
-|---|---|---|
-| ![Clips — saved audio clips browseable per species](docs/screenshots/clips.png) | ![Reports — daily summaries, species filtering, CSV download](docs/screenshots/reports.png) | ![Settings — recording location, MQTT broker, classifier device assignment](docs/screenshots/settings.png) |
+<!-- More screenshots will appear here as PNGs are added to docs/screenshots/.
+     Suggested next captures: clips library, reports / CSV download, settings page.
+     See docs/screenshots/README.md for filename and format guidance. -->
 
 ---
 
@@ -801,9 +798,9 @@ The v1 metrics (RMS + Acoustic Complexity Index after Pieretti et al. 2011, plus
 
 ---
 
-### Inspiration
+### Contributor & Inspiration
 
-This project was inspired by the work and vision of **Dr. Curt Lamberth**, whose research into acoustic biodiversity monitoring provided the founding ideas behind this system.
+**Dr. Curt Lamberth** is both a contributor to and an inspiration for this project. Originally trained as a chemist, Curt spent time in industry and worked as an environmental consultant for twenty years. He now combines inventing electronic gadgets, sensors and wireless systems with his passion for environmental conservation — with specific interests in eco-hydrology, plants, micro-lepidoptera, and the application of technology in science.
 
 ---
 

@@ -379,7 +379,12 @@ tr:hover td { background: var(--surface2); }
 
 /* ── Nav footer ── */
 .nav-footer { margin-top: auto; padding: 12px; border-top: 1px solid var(--border); }
-.nav-footer-name { font-size: 0.82rem; font-weight: 600; color: var(--text); }
+.nav-footer-name {
+  font-size: 0.82rem;
+  font-weight: 600;
+  color: var(--text);
+  margin: 10px;
+}
 .nav-footer-org { font-size: 0.72rem; color: var(--muted); margin-bottom: 8px; }
 .btn-about {
   width: 100%; padding: 6px 10px; background: var(--surface2);
