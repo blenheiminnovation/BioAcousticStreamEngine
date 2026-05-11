@@ -77,8 +77,15 @@ class BeeClassifier(BaseClassifier):
     def load(self) -> None:
         if not _BUZZDETECT_DIR.exists():
             _log.info("BuzzDetect model not found — downloading automatically…")
-            self._fetch_buzzdetect()
-        self._load_models()
+            try:
+                self._fetch_buzzdetect()
+            except RuntimeError as exc:
+                _log.warning("BeeClassifier disabled: %s", exc)
+                return  # yamnet/transfer stay None; classify() returns []
+        try:
+            self._load_models()
+        except Exception as exc:
+            _log.warning("BeeClassifier disabled — failed to load models: %s", exc)
 
     def _fetch_buzzdetect(self) -> None:
         import subprocess

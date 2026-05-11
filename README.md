@@ -69,7 +69,12 @@ python3 -m venv .venv
 
 #### 3. Bee classifier model (BuzzDetect)
 
-No action needed — if `bee` is active in `config/settings.yaml`, BASE downloads the BuzzDetect model automatically on first run (~16 MB, one-time). Requires `git` to be installed.
+No action needed — if `bee` is active in `config/settings.yaml`, BASE downloads the BuzzDetect model automatically on first run (~16 MB, one-time).
+
+> **Requires `git`** — the auto-download uses `git clone`. If `git` is not installed the bee classifier will be silently disabled rather than crash, but you will get no bee detections. Install it with:
+> ```bash
+> sudo apt-get install -y git
+> ```
 
 #### 4. Output directories and config
 
