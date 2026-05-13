@@ -146,14 +146,18 @@ main {
 }
 .feed:empty::after { content: 'Waiting for detections...'; color: var(--muted); font-size: 0.85rem; }
 .detection-card {
-  display: flex; align-items: center; gap: 12px;
+  display: flex; align-items: center; gap: 10px;
   background: var(--surface2); border: 1px solid var(--border);
-  border-radius: var(--radius); padding: 10px 14px;
+  border-radius: var(--radius); padding: 9px 12px;
   animation: slideIn 0.25s ease;
 }
 @keyframes slideIn { from { opacity: 0; transform: translateY(-6px); } to { opacity: 1; transform: none; } }
-.detection-card .species { font-weight: 600; font-size: 0.9rem; flex: 1; }
-.detection-card .scientific { font-size: 0.78rem; color: var(--muted); font-style: italic; }
+.det-body { flex: 1; min-width: 0; }
+.det-top { display: flex; align-items: baseline; gap: 8px; flex-wrap: wrap; }
+.det-bottom { display: flex; justify-content: space-between; align-items: center; margin-top: 3px; gap: 8px; }
+.det-meta { display: flex; gap: 8px; align-items: center; flex-shrink: 0; }
+.detection-card .species { font-weight: 600; font-size: 0.9rem; }
+.detection-card .scientific { font-size: 0.75rem; color: var(--muted); font-style: italic; flex: 1; min-width: 0; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
 .detection-card .time { font-family: var(--mono); font-size: 0.75rem; color: var(--muted); }
 .detection-card .conf { font-family: var(--mono); font-size: 0.82rem; font-weight: 600; }
 .conf-high { color: var(--primary); }
@@ -521,7 +525,7 @@ tr:hover td { background: var(--surface2); }
 /* ── Dashboard two-column layout ── */
 .dashboard-layout {
   display: grid;
-  grid-template-columns: 1fr 340px;
+  grid-template-columns: 1fr 420px;
   gap: 20px;
   align-items: start;
 }

@@ -433,13 +433,19 @@ function detectionCard(det) {
   return `
     <div class="detection-card">
       <span class="classifier-badge">${icon} ${det.classifier}</span>
-      <div style="flex:1">
-        <div class="species">${det.species_common}</div>
-        <div class="scientific">${det.species_scientific}</div>
+      <div class="det-body">
+        <div class="det-top">
+          <span class="species">${det.species_common}</span>
+          ${deviceTag}
+        </div>
+        <div class="det-bottom">
+          <span class="scientific">${det.species_scientific || ''}</span>
+          <span class="det-meta">
+            <span class="conf ${confClass(det.confidence)}">${pct}%</span>
+            <span class="time">${det.time}</span>
+          </span>
+        </div>
       </div>
-      ${deviceTag}
-      <span class="conf ${confClass(det.confidence)}">${pct}%</span>
-      <span class="time">${det.time}</span>
     </div>`;
 }
 
