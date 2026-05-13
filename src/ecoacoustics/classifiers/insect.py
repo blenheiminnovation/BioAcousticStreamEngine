@@ -89,6 +89,7 @@ class InsectClassifier(BaseClassifier):
         # crickets (10–40 kHz) while rejecting most bird song (1–5 kHz).
         self._freq_min_hz: int = config.get("freq_min_hz", 4500)
         self._freq_max_hz: int = config.get("freq_max_hz", 20000)
+        self._report_cooldown_secs: float = config.get("report_cooldown_secs", 60.0)
         self._model = None
         self._classes: list[str] = []
 
@@ -103,6 +104,10 @@ class InsectClassifier(BaseClassifier):
     @property
     def freq_max_hz(self) -> int:
         return self._freq_max_hz
+
+    @property
+    def report_cooldown_secs(self) -> float:
+        return self._report_cooldown_secs
 
     def load(self) -> None:
         """Load the OpenSoundscape CNN model if configured and available."""

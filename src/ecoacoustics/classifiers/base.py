@@ -66,6 +66,11 @@ class BaseClassifier(ABC):
         """Upper bandpass frequency (Hz); None means no low-pass filter."""
         return None
 
+    @property
+    def report_cooldown_secs(self) -> float:
+        """Minimum seconds between reporting the same species. 0 means no limit."""
+        return 0.0
+
     @abstractmethod
     def classify(self, chunk: AudioChunk) -> list[Detection]:
         """Run inference on one audio chunk and return any detections found.

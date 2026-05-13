@@ -392,9 +392,9 @@ function updateVuMeter(db) {
   bar.style.width = pct + '%';
   bar.className = 'vu-bar' + (pct > 85 ? ' high' : pct > 65 ? ' mid' : '');
   label.textContent = db.toFixed(1) + ' dB';
-  // Reset to "no signal" if no update arrives within 6 seconds
+  // Reset to "no signal" if no update arrives within 3 seconds
   if (_vuResetTimer) clearTimeout(_vuResetTimer);
-  _vuResetTimer = setTimeout(resetVuMeter, 6000);
+  _vuResetTimer = setTimeout(resetVuMeter, 3000);
 }
 
 function resetVuMeter() {

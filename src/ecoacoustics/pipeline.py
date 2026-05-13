@@ -202,6 +202,12 @@ class Pipeline:
             f"Press Ctrl+C to stop.\n"
         )
 
+        if self._level_callback:
+            level_thread = threading.Thread(
+                target=self._run_level_monitor, daemon=True
+            )
+            level_thread.start()
+
         with concurrent.futures.ThreadPoolExecutor(max_workers=len(self._classifiers)) as pool:
             futures = [
                 pool.submit(self._classifier_loop, clf, session)
@@ -240,6 +246,8 @@ class Pipeline:
         capture = self._captures[self._clf_capture_key[clf.name]]
         processor = self._processors[clf.name]
         consecutive_errors = 0
+        cooldown_secs: float = clf.report_cooldown_secs
+        last_reported: dict[str, float] = {}
 
         # Chunks older than this are skipped — prevents a backed-up queue from
         # replaying stale audio long after it was captured.
@@ -281,19 +289,20 @@ class Pipeline:
                 if time.time() - last_bird < bird_suppress_secs:
                     continue
 
-            if self._level_callback:
-                try:
-                    rms = float(np.sqrt(np.mean(chunk.data ** 2)))
-                    db = 20 * math.log10(max(rms, 1e-10))
-                    print(f"[LEVEL] db={db:.1f} rms={rms:.6f}", flush=True)
-                    self._level_callback(db)
-                except Exception as _lev_exc:
-                    print(f"[LEVEL] error: {_lev_exc}", flush=True)
-
             try:
                 processed = processor.process(chunk)
                 detections = clf.classify(processed)
                 consecutive_errors = 0  # reset on any successful inference
+
+                # Drop detections for species reported too recently (cooldown gate).
+                # Prevents constant false positives from fan noise or transient bird
+                # calls overwhelming the output while real events remain reportable.
+                if cooldown_secs > 0 and detections:
+                    now = time.time()
+                    detections = [
+                        d for d in detections
+                        if now - last_reported.get(d.label, 0.0) >= cooldown_secs
+                    ]
 
                 if not detections:
                     continue
@@ -302,6 +311,10 @@ class Pipeline:
                     self._last_detection_time[clf.name] = time.time()
 
                 self._logger.log(detections, session)
+
+                _now = time.time()
+                for det in detections:
+                    last_reported[det.label] = _now
 
                 for det in detections:
                     saved_path, is_new = self._clip_manager.process(
@@ -343,6 +356,27 @@ class Pipeline:
     # ------------------------------------------------------------------
     # Internal helpers
     # ------------------------------------------------------------------
+
+    def _run_level_monitor(self) -> None:
+        """Poll each active capture's instantaneous RMS once per second and
+        forward the loudest reading to the level callback.
+
+        Runs in a dedicated daemon thread so audio level updates reach the UI
+        independently of how long classifier inference takes.  The polling
+        interval is intentionally shorter than the VU-meter reset timeout so
+        the bar never blanks between slow OpenSoundscape inference cycles.
+        """
+        while not self._stop_event.is_set():
+            try:
+                max_rms = max(
+                    (c.last_rms for c in self._captures.values() if c.is_active),
+                    default=0.0,
+                )
+                db = 20 * math.log10(max(max_rms, 1e-10))
+                self._level_callback(db)
+            except Exception:
+                pass
+            self._stop_event.wait(1.0)
 
     def _build_classifiers(self) -> list[BaseClassifier]:
         """Instantiate classifiers listed in settings.yaml classifiers.active."""

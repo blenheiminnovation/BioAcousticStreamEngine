@@ -82,6 +82,7 @@ class AudioCapture:
         self._started_at: float = 0.0   # unix time when stream was last opened
         self._overflow_count: int = 0   # sounddevice input overflow events
         self._chunk_start_time: float = 0.0  # wall time when current chunk accumulation began
+        self._last_rms: float = 0.0     # RMS of the most recent callback frame
 
     # ------------------------------------------------------------------
     # Public API
@@ -214,6 +215,11 @@ class AudioCapture:
         """Number of sounddevice input-overflow events since stream start."""
         return self._overflow_count
 
+    @property
+    def last_rms(self) -> float:
+        """RMS amplitude of the most recently received audio frame (updated every callback)."""
+        return self._last_rms
+
     # ------------------------------------------------------------------
     # Internal callback (runs in sounddevice thread)
     # ------------------------------------------------------------------
@@ -231,6 +237,7 @@ class AudioCapture:
             self._overflow_count += 1
 
         mono = indata[:, 0] if indata.ndim > 1 else indata.ravel()
+        self._last_rms = float(np.sqrt(np.mean(mono ** 2)))
         now = time.time()
 
         with self._lock:
