@@ -518,6 +518,35 @@ tr:hover td { background: var(--surface2); }
 }
 #spec-canvas { display: block; width: 100%; height: 220px; }
 
+/* ── Dashboard two-column layout ── */
+.dashboard-layout {
+  display: grid;
+  grid-template-columns: 1fr 340px;
+  gap: 20px;
+  align-items: start;
+}
+.dashboard-main-col {
+  display: flex;
+  flex-direction: column;
+  gap: 20px;
+  min-width: 0;
+}
+.dashboard-feed-col {
+  position: sticky;
+  top: 0;
+}
+.dashboard-feed-card {
+  display: flex;
+  flex-direction: column;
+  max-height: calc(100vh - var(--header-h) - 48px);
+  overflow: hidden;
+}
+.dashboard-feed-card .feed {
+  flex: 1;
+  max-height: none;
+  overflow-y: auto;
+}
+
 /* ── Scrollbar ── */
 ::-webkit-scrollbar { width: 5px; }
 ::-webkit-scrollbar-track { background: transparent; }

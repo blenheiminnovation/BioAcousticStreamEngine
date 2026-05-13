@@ -219,56 +219,64 @@ async function _refreshSummaryStats() {
 /* ─────────────────────────── DASHBOARD ─────────────────────────── */
 function renderDashboard() {
   document.getElementById('main').innerHTML = `
-    <div class="grid-4">
-      <div class="card stat" id="stat-species"><div class="value">—</div><div class="label">Species today</div></div>
-      <div class="card stat" id="stat-calls"><div class="value">—</div><div class="label">Calls today</div></div>
-      <div class="card stat" id="stat-window"><div class="value" style="font-size:1rem">—</div><div class="label">Active window</div></div>
-      <div class="card stat" id="stat-disk"><div class="value">—</div><div class="label">Disk free (GB)</div></div>
-    </div>
+    <div class="dashboard-layout">
 
-    <div class="card">
-      <div class="card-title">Status</div>
-      <div class="state-banner" id="state-banner">
-        <div class="banner-dot"></div>
-        <div class="banner-text">
-          <div class="banner-title">Ready to listen</div>
-          <div class="banner-sub">Select a device and start listening, or run the automated schedule.</div>
+      <div class="dashboard-main-col">
+        <div class="grid-4">
+          <div class="card stat" id="stat-species"><div class="value">—</div><div class="label">Species today</div></div>
+          <div class="card stat" id="stat-calls"><div class="value">—</div><div class="label">Calls today</div></div>
+          <div class="card stat" id="stat-window"><div class="value" style="font-size:1rem">—</div><div class="label">Active window</div></div>
+          <div class="card stat" id="stat-disk"><div class="value">—</div><div class="label">Disk free (GB)</div></div>
+        </div>
+
+        <div class="card">
+          <div class="card-title">Status</div>
+          <div class="state-banner" id="state-banner">
+            <div class="banner-dot"></div>
+            <div class="banner-text">
+              <div class="banner-title">Ready to listen</div>
+              <div class="banner-sub">Select a device and start listening, or run the automated schedule.</div>
+            </div>
+          </div>
+        </div>
+
+        <div class="card">
+          <div style="display:flex;align-items:center;justify-content:space-between">
+            <div class="card-title" style="margin:0">Live Spectrogram ${helpBtn('spectrogram')}</div>
+            <button class="btn btn-sm btn-outline" id="btn-spec-toggle" onclick="toggleSpectrogram()">■ Stop</button>
+          </div>
+          <div class="spec-panel show" id="spec-panel">
+            <div class="spec-toolbar">
+              <label>Mic</label>
+              <select id="spec-device" onchange="changeSpecDevice()"><option value="">Default microphone</option></select>
+              <label><input type="checkbox" id="spec-log" style="accent-color:var(--primary)"> Log scale</label>
+            </div>
+            <div class="spec-wrap">
+              <canvas id="spec-canvas" width="1200" height="220"></canvas>
+              <div class="spec-freq-axis" id="spec-axis"></div>
+            </div>
+          </div>
+        </div>
+
+        <div class="card">
+          <div class="card-title">Recording Devices</div>
+          <div id="device-panel"><div class="empty">Loading devices...</div></div>
         </div>
       </div>
-    </div>
 
-    <div class="card">
-      <div style="display:flex;align-items:center;justify-content:space-between">
-        <div class="card-title" style="margin:0">Live Spectrogram ${helpBtn('spectrogram')}</div>
-        <button class="btn btn-sm btn-outline" id="btn-spec-toggle" onclick="toggleSpectrogram()">■ Stop</button>
-      </div>
-      <div class="spec-panel show" id="spec-panel">
-        <div class="spec-toolbar">
-          <label>Mic</label>
-          <select id="spec-device" onchange="changeSpecDevice()"><option value="">Default microphone</option></select>
-          <label><input type="checkbox" id="spec-log" style="accent-color:var(--primary)"> Log scale</label>
-        </div>
-        <div class="spec-wrap">
-          <canvas id="spec-canvas" width="1200" height="220"></canvas>
-          <div class="spec-freq-axis" id="spec-axis"></div>
+      <div class="dashboard-feed-col">
+        <div class="card dashboard-feed-card">
+          <div class="card-title">Live Detections ${helpBtn('live_detections')}</div>
+          <div class="vu-meter" id="vu-meter">
+            <span class="vu-label">🎙 Audio in ${helpBtn('vu_meter')}</span>
+            <div class="vu-bar-wrap"><div class="vu-bar" id="vu-bar"></div></div>
+            <span class="vu-db" id="vu-db"><span class="vu-no-signal">no signal</span></span>
+          </div>
+          ${renderTabs('feed-tabs')}
+          <div class="feed" id="live-feed"></div>
         </div>
       </div>
-    </div>
 
-    <div class="card">
-      <div class="card-title">Recording Devices</div>
-      <div id="device-panel"><div class="empty">Loading devices...</div></div>
-    </div>
-
-    <div class="card" style="flex:1">
-      <div class="card-title">Live Detections ${helpBtn('live_detections')}</div>
-      <div class="vu-meter" id="vu-meter">
-        <span class="vu-label">🎙 Audio in ${helpBtn('vu_meter')}</span>
-        <div class="vu-bar-wrap"><div class="vu-bar" id="vu-bar"></div></div>
-        <span class="vu-db" id="vu-db"><span class="vu-no-signal">no signal</span></span>
-      </div>
-      ${renderTabs('feed-tabs')}
-      <div class="feed" id="live-feed"></div>
     </div>
   `;
 
