@@ -247,10 +247,18 @@ class Pipeline:
 
         # Cross-classifier suppression: insect inference is skipped for this
         # many seconds after the bird classifier last produced a detection.
-        # Blue Tit and other songbirds produce spectrograms in the 5-8 kHz band
-        # that the orthoptera model confuses with Field Cricket / Field Grasshopper
-        # even at high confidence. Set to 0 to disable.
+        # Only applies when bird and insect share the same physical microphone —
+        # if they are on separate devices the audio streams are independent and
+        # bird activity on one mic cannot contaminate the other.
         bird_suppress_secs: float = self._cfg.get("insect", {}).get("bird_suppress_secs", 10.0)
+        # Compare the device part (index 1) of each classifier's capture key.
+        _insect_device = self._clf_capture_key.get("insect", (None, None))[1]
+        _bird_device = self._clf_capture_key.get("bird", (None, None))[1]
+        bird_suppress_active = (
+            clf.name == "insect"
+            and bird_suppress_secs > 0
+            and _insect_device == _bird_device
+        )
 
         while not self._stop_event.is_set():
             chunk = capture.get_chunk(timeout=1.0)
@@ -265,8 +273,9 @@ class Pipeline:
                 )
                 continue
 
-            # Skip insect inference while birds have been detected recently.
-            if clf.name == "insect" and bird_suppress_secs > 0:
+            # Skip insect inference while birds have been detected recently
+            # (shared-mic only — separate mics run independently).
+            if bird_suppress_active:
                 with self._detection_time_lock:
                     last_bird = self._last_detection_time.get("bird", 0.0)
                 if time.time() - last_bird < bird_suppress_secs:
