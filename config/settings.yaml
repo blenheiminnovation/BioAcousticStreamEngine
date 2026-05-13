@@ -35,7 +35,7 @@ insect:
   clip_duration: 4.0
   freq_max_hz: 20000
   freq_min_hz: 2000
-  min_confidence: 0.5
+  min_confidence: 0.75
   model_path: models/orthoptera_uk.model
   sample_rate: 44100
   silence_threshold: 0.001

@@ -114,6 +114,61 @@ bash start_web.sh
 
 ---
 
+### Raspberry Pi (untested — community feedback welcome)
+
+BASE is built on cross-platform Python and *should* run on a Raspberry Pi, but it has not yet been validated end-to-end on Pi hardware. The notes below are best-guess guidance — please open an issue if you hit something that needs documenting.
+
+#### Recommended hardware
+
+- **Raspberry Pi 5** (4 GB or 8 GB) if you want to run several classifiers concurrently. A **Pi 4 (≥4 GB)** will work for one or two classifiers but is likely to be CPU-bound with birds + bees + insects all active.
+- **Active cooling** — heatsink + fan, or the official Pi 5 active cooler. Continuous ML inference will pin the CPU and trigger thermal throttling without it.
+- **Quality power supply** — the official 27 W USB-C PSU for Pi 5, or 15 W for Pi 4. Under-volting corrupts SD cards.
+- **USB SSD for clip storage** — clip files accumulate quickly under 24/7 monitoring and SD cards wear out under sustained writes. Use an external SSD for any deployment longer than a few days.
+- **USB microphone** — the Pi's 3.5 mm jack is output-only. For ultrasonic bat capture (≥192 kHz) you need a dedicated probe such as the [Dodotronic UltraMic 192K](https://www.dodotronic.com/) or [Pettersson M500-384](https://batsound.com/product/m500-384/).
+
+#### OS and Python version
+
+- Use **Raspberry Pi OS Bookworm (64-bit)** — flash with [Raspberry Pi Imager](https://www.raspberrypi.com/software/). The 32-bit (armv7l) image will not work; TensorFlow and PyTorch only publish aarch64 wheels.
+- Bookworm ships with **Python 3.11**, which is the recommended target. `pyproject.toml` requires `>=3.10`; **3.10, 3.11, and 3.12** all satisfy TensorFlow 2.16+ and current PyTorch. Avoid 3.13+ until you've confirmed every model dependency still publishes wheels.
+- The [piwheels](https://www.piwheels.org/) ARM wheel index is enabled by default on Pi OS — most `pip install` calls will pull pre-built binaries rather than compile from source.
+
+#### Install steps
+
+The [Manual install](#manual-install) steps above should work as-is on a Pi:
+
+```bash
+sudo apt-get update
+sudo apt-get install -y libportaudio2 libsndfile1 python3-venv python3-dev git pipewire-pulse
+git clone https://github.com/blenheiminnovation/BioAcousticStreamEngine.git
+cd BioAcousticStreamEngine
+python3 -m venv .venv
+.venv/bin/pip install -e "."
+```
+
+Heads-up: the first install pulls down TensorFlow + PyTorch (via BatDetect2) and is large (~1.5 GB on disk). Budget **15–30 min on a Pi 4** for the pip step; SD-card I/O dominates.
+
+#### Likely gotchas
+
+- **`tensorflow-cpu` may not have an aarch64 wheel.** [pyproject.toml](pyproject.toml#L20) pins `tensorflow-cpu>=2.16`, but `tensorflow-cpu` is historically an x86_64-only PyPI package. On Pi you may need to swap it for the regular `tensorflow` package (which *does* publish aarch64 wheels from 2.15+), or replace it with `tflite-runtime` since birdnetlib only needs TFLite at runtime. If `pip install -e .` fails on the TensorFlow line, edit pyproject.toml and try `tensorflow>=2.16` or `tflite-runtime`.
+- **BirdNET via TFLite is comfortably real-time** on a Pi 4 with one microphone. This is the lightest classifier — start here.
+- **BatDetect2** uses PyTorch and is **~5–10× slower on Pi 4 than desktop** for ultrasonic CNN inference. Workable, but consider a longer chunk duration or scheduling it to specific dusk/dawn windows only. Pi 5 handles it more comfortably.
+- **OpenSoundscape (insect classifier)** drags in the full PyTorch wheel (~500 MB) and is the heaviest single dependency. Consider running the insect classifier only in scheduled windows rather than 24/7.
+- **Running every classifier at once** will likely exceed a Pi 4's CPU budget. Use the *Schedule → Classifiers & Microphones* panel to disable classifiers you don't need, or to stagger them across listening windows.
+- **PipeWire / `pactl` device listing**: Bookworm uses PipeWire with the PulseAudio shim, so the web UI's device picker works out of the box. On a stripped-down headless install you may need `sudo apt-get install -y pipewire-pulse` explicitly.
+- **Headless operation**: SSH in, run `bash start_web.sh`, then point a browser from another machine at `http://<pi-hostname>.local:8000`. The Pi 4's HDMI-attached browser will struggle to render the live spectrogram smoothly — view it remotely.
+- **MQTT**: the Mosquitto broker runs natively on Pi (`sudo apt-get install -y mosquitto`); no Pi-specific changes needed beyond the standard [MQTT](#mqtt) section.
+
+#### Useful links
+
+- [Raspberry Pi OS download / Pi Imager](https://www.raspberrypi.com/software/) — flash Bookworm 64-bit
+- [piwheels.org](https://www.piwheels.org/) — pre-built ARM Python wheels for Pi
+- [TensorFlow pip install matrix](https://www.tensorflow.org/install/pip) — confirm aarch64 wheel availability for your Python version
+- [PyTorch get-started](https://pytorch.org/get-started/locally/) — aarch64 wheels are first-class for Linux
+- [BirdNET-Pi project](https://github.com/Nachtzuster/BirdNET-Pi) — community Pi-only BirdNET deployment; useful prior art for audio tuning and systemd setup
+- [Dodotronic UltraMic](https://www.dodotronic.com/) / [Pettersson M500-384](https://batsound.com/product/m500-384/) — ultrasonic microphone suppliers for bat detection
+
+---
+
 ## Web UI
 
 BioAcoustic Stream Engine (BASE) includes a browser-based dashboard for managing and monitoring the system without touching the command line.

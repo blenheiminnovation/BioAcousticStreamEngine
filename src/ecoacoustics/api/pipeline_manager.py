@@ -138,32 +138,39 @@ class PipelineManager:
         from ecoacoustics.scheduler import Scheduler
 
         try:
-            with open(self._config_path) as f:
-                cfg = yaml.safe_load(f)
-
-            scheduler = Scheduler.from_config(cfg)
-            adaptive_cfg = cfg.get("schedule", {}).get("adaptive", {})
             all_species: set[str] = set()
 
-            self._pipeline = Pipeline(
-                config_path=self._config_path,
-                detection_callback=self._on_detection,
-                level_callback=self._on_level,
-                device_override=self._device_index,
-            )
-
             while self._state == "scheduled":
+                # Re-read config and rebuild scheduler/pipeline each iteration so
+                # classifier and schedule changes saved via the UI take effect on
+                # the next window, not on restart. adapt() is idempotent given
+                # the cumulative species set, so re-applying it is safe.
+                with open(self._config_path) as f:
+                    cfg = yaml.safe_load(f)
+                scheduler = Scheduler.from_config(cfg)
+                adaptive_cfg = cfg.get("schedule", {}).get("adaptive", {})
+                scheduler.adapt(all_species, adaptive_cfg)
+
                 current = scheduler.current_window()
                 if current:
                     start, end, name = current
                     remaining = (end - datetime.now(start.tzinfo)).total_seconds()
                     if remaining > 5:
                         self._window = name
-                        session = self._pipeline.run(
-                            window_name=name, duration_seconds=remaining
+                        self._pipeline = Pipeline(
+                            config_path=self._config_path,
+                            detection_callback=self._on_detection,
+                            level_callback=self._on_level,
+                            device_override=self._device_index,
                         )
-                        all_species |= session.species_detected()
-                        scheduler.adapt(all_species, adaptive_cfg)
+                        try:
+                            session = self._pipeline.run(
+                                window_name=name, duration_seconds=remaining
+                            )
+                            all_species |= session.species_detected()
+                        finally:
+                            self._pipeline.close()
+                            self._pipeline = None
                         continue
 
                 nw = scheduler.next_window()

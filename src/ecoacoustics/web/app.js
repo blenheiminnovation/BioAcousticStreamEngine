@@ -526,6 +526,12 @@ async function loadClassifierDevices() {
           </div>
         </div>`;
     }).join('');
+
+    // Auto-save on any change so the YAML always matches the UI — otherwise
+    // users uncheck a classifier, never click Save, and the next Listen Now
+    // re-spins up the unwanted classifier from stale config.
+    panel.querySelectorAll('input[id^="clf-active-"], select[id^="clf-device-"]')
+      .forEach(el => el.addEventListener('change', saveClassifiers));
   } catch (err) {
     panel.innerHTML = `<div class="empty" style="color:var(--danger)">${err.message}</div>`;
   }
@@ -533,7 +539,7 @@ async function loadClassifierDevices() {
 
 async function saveClassifiers() {
   const btn = document.getElementById('btn-save-classifiers');
-  btnLoad(btn, '⟳ Saving...');
+  if (btn) btnLoad(btn, '⟳ Saving...');
   const active = ['bird', 'bat', 'bee', 'insect', 'soil'].filter(k =>
     document.getElementById(`clf-active-${k}`)?.checked
   );
@@ -544,10 +550,10 @@ async function saveClassifiers() {
   }
   try {
     await api.post('/api/settings/classifiers', { active, devices });
-    toast('Classifier settings saved — restart pipeline to apply', 'success', 5000);
+    toast('Classifier settings saved — applies on next Listen Now', 'success', 4000);
   } catch (err) {
     toast(err.message, 'error', 6000);
-  } finally { btnDone(btn); }
+  } finally { if (btn) btnDone(btn); }
 }
 
 async function loadSchedule() {
