@@ -115,6 +115,10 @@ class Pipeline:
 
         self._stop_event = threading.Event()
         self._level_callback = level_callback
+        # Tracks the last time each classifier produced a detection (used for
+        # cross-classifier suppression — e.g. bird activity suppressing insect).
+        self._last_detection_time: dict[str, float] = {}
+        self._detection_time_lock = threading.Lock()
         # Keyed by (sample_rate, device) so each classifier can use a different mic
         self._captures: dict[tuple, AudioCapture] = {}
         self._clf_capture_key: dict[str, tuple] = {}
@@ -241,6 +245,13 @@ class Pipeline:
         # replaying stale audio long after it was captured.
         max_chunk_age: float = self._cfg.get("audio", {}).get("max_chunk_age_seconds", 30.0)
 
+        # Cross-classifier suppression: insect inference is skipped for this
+        # many seconds after the bird classifier last produced a detection.
+        # Blue Tit and other songbirds produce spectrograms in the 5-8 kHz band
+        # that the orthoptera model confuses with Field Cricket / Field Grasshopper
+        # even at high confidence. Set to 0 to disable.
+        bird_suppress_secs: float = self._cfg.get("insect", {}).get("bird_suppress_secs", 10.0)
+
         while not self._stop_event.is_set():
             chunk = capture.get_chunk(timeout=1.0)
             if chunk is None:
@@ -253,6 +264,13 @@ class Pipeline:
                     f"({age:.0f}s old, max={max_chunk_age:.0f}s)[/yellow]"
                 )
                 continue
+
+            # Skip insect inference while birds have been detected recently.
+            if clf.name == "insect" and bird_suppress_secs > 0:
+                with self._detection_time_lock:
+                    last_bird = self._last_detection_time.get("bird", 0.0)
+                if time.time() - last_bird < bird_suppress_secs:
+                    continue
 
             if self._level_callback:
                 try:
@@ -270,6 +288,9 @@ class Pipeline:
 
                 if not detections:
                     continue
+
+                with self._detection_time_lock:
+                    self._last_detection_time[clf.name] = time.time()
 
                 self._logger.log(detections, session)
 

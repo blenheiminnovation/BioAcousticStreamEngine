@@ -32,6 +32,7 @@ clips:
   max_per_species: 100
   species_db: output/known_species.json
 insect:
+  bird_suppress_secs: 10
   clip_duration: 4.0
   freq_max_hz: 20000
   freq_min_hz: 4500
