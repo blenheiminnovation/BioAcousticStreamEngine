@@ -85,6 +85,10 @@ class InsectClassifier(BaseClassifier):
         self._silence_threshold: float = config.get("silence_threshold", 0.001)
         self._model_path: Optional[str] = config.get("model_path")
         self._clip_duration: float = config.get("clip_duration", 3.0)
+        # 4500 Hz floor keeps UK grasshopper fundamentals (5–8 kHz) and bush
+        # crickets (10–40 kHz) while rejecting most bird song (1–5 kHz).
+        self._freq_min_hz: int = config.get("freq_min_hz", 4500)
+        self._freq_max_hz: int = config.get("freq_max_hz", 20000)
         self._model = None
         self._classes: list[str] = []
 
@@ -94,11 +98,11 @@ class InsectClassifier(BaseClassifier):
 
     @property
     def freq_min_hz(self) -> int:
-        return 2000
+        return self._freq_min_hz
 
     @property
     def freq_max_hz(self) -> int:
-        return 20000
+        return self._freq_max_hz
 
     def load(self) -> None:
         """Load the OpenSoundscape CNN model if configured and available."""
