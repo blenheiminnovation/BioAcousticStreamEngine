@@ -540,6 +540,8 @@ The pipeline will automatically set up the correct audio stream and frequency fi
 
 ## Training a Custom Insect Classifier
 
+> **Note — model v1 in service, v2 in training.** The grasshopper and cricket classifier currently deployed is a first-attempt ResNet18 trained by Blenheim Palace Innovation. It is fully operational and detecting 8 UK Orthoptera species, but accuracy improvements are underway — the model is being retrained with a larger, more carefully curated dataset. An updated model will be pushed as soon as it is validated. In the meantime, a 60-second per-species detection cooldown is applied to reduce false positives from ambient noise sources such as mechanical hum and bird calls.
+
 The insect classifier ([insect.py](src/ecoacoustics/classifiers/insect.py)) accepts any [OpenSoundscape](https://opensoundscape.org/) `.model` file. The notebooks in [training/notebooks/](training/notebooks/) walk through the full pipeline — ECOSoundSet audio → labelled clips → trained ResNet18 → deployed in BASE.
 
 ### Why a separate environment
@@ -643,7 +645,7 @@ Restart BASE — insect detections will appear in the live feed immediately.
 - [x] MQTT live feed — direct and bridge connection modes, configurable via UI
 - [x] Multi-microphone support — per-classifier device assignment
 - [x] Bee buzz classifier — BuzzDetect v1.0.1 (YAMNet, 16 kHz; detects insect flight buzz)
-- [x] Insect classifier — grasshoppers and bush crickets; ResNet18 v1 trained by Blenheim Palace Innovation on InsectSet459 + ECOSoundSet, 8 UK species
+- [x] Insect classifier — grasshoppers and bush crickets; ResNet18 v1 trained by Blenheim Palace Innovation on InsectSet459 + ECOSoundSet, 8 UK species *(v1 operational; model retraining in progress — improved version coming soon)*
 - [x] Soil Acoustic Index (SAI v2) — Blenheim Innovation; NDSI + bio-band RMS + transient gate, rejects traffic rumble, mains hum, propeller and helicopter noise
 - [x] Species activity heatmaps by time of day and season
 

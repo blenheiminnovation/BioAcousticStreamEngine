@@ -18,6 +18,7 @@ const state = {
   detections: [],
   classifierFilter: 'all',
   connected: true,
+  gallery: {},  // key: species_common → { det, count, bestConf }
 };
 
 /* ── API ── */
@@ -159,7 +160,7 @@ const router = {
     document.querySelectorAll('nav a').forEach(a =>
       a.classList.toggle('active', a.getAttribute('href') === `#${page}`)
     );
-    ({ dashboard: renderDashboard, schedule: renderSchedule, clips: renderClips, reports: renderReports, settings: renderSettings }[page] || renderDashboard)();
+    ({ dashboard: renderDashboard, gallery: renderGallery, schedule: renderSchedule, clips: renderClips, reports: renderReports, settings: renderSettings }[page] || renderDashboard)();
   },
 };
 
@@ -176,6 +177,7 @@ const ws = {
     if (data.type === 'detection') {
       state.detections.unshift(data);
       if (state.detections.length > MAX_FEED_ITEMS) state.detections.pop();
+      updateGallery(data);
       if (state.page === 'dashboard') prependDetection(data);
       const tabsEl = document.getElementById('feed-tabs');
       if (tabsEl) tabsEl.outerHTML = renderTabs('feed-tabs');
@@ -278,6 +280,7 @@ function renderDashboard() {
       </div>
 
     </div>
+
   `;
 
   refreshDashboard();
@@ -416,6 +419,258 @@ function prependDetection(det) {
 }
 
 function confClass(c) { return c >= 0.75 ? 'conf-high' : c >= 0.5 ? 'conf-mid' : 'conf-low'; }
+
+/* ── Species gallery ── */
+
+// Credits cache: filename → { author, license, license_url, source_url }
+let _galleryCredits = {};
+
+async function _loadGalleryCredits() {
+  try {
+    const data = await api.get('/api/gallery');
+    _galleryCredits = {};
+    for (const img of data.images) _galleryCredits[img.filename] = img;
+  } catch (_) {}
+}
+
+function _galleryItemId(species) {
+  return 'gi_' + species.toLowerCase().replace(/[^a-z0-9]+/g, '_').replace(/^_|_$/, '');
+}
+
+function _speciesKey(name) {
+  // Matches the Python normalize() and JS must stay in sync.
+  // Apostrophes are stripped so "Roesel's" → "roesels" not "roesel_s".
+  return name.toLowerCase().replace(/'/g, '').replace(/[^a-z0-9]+/g, '_').replace(/^_|_$/, '');
+}
+
+function _speciesImageUrl(name) {
+  return `/species_images/${_speciesKey(name)}.jpg`;
+}
+
+function _creditLine(name) {
+  const key  = _speciesKey(name);
+  const info = _galleryCredits[key + '.jpg'] || _galleryCredits[key + '.png'] || null;
+  if (!info || !info.author || info.author === 'Unknown') return '';
+  const text = info.license ? `© ${info.author} / ${info.license}` : `© ${info.author}`;
+  return info.source_url
+    ? `<a class="gallery-credit" href="${info.source_url}" target="_blank" rel="noopener">${text}</a>`
+    : `<span class="gallery-credit">${text}</span>`;
+}
+
+function galleryCard(entry) {
+  const { det, count, bestConf } = entry;
+  const pct = Math.round(bestConf * 100);
+  const clf = CLASSIFIERS.find(c => c.key === det.classifier);
+  const icon = clf ? clf.icon : '◈';
+  return `
+    <div class="gallery-item" id="${_galleryItemId(det.species_common)}">
+      <div class="gallery-img-wrap">
+        <img src="${_speciesImageUrl(det.species_common)}"
+             onerror="this.onerror=null;this.src='/species_images/_placeholder.svg';this.classList.add('gallery-placeholder')"
+             loading="lazy" alt="${det.species_common}">
+        <span class="gallery-count">×${count}</span>
+        ${_creditLine(det.species_common)}
+      </div>
+      <div class="gallery-info">
+        <div class="gallery-name">${det.species_common}</div>
+        <div class="gallery-sci">${det.species_scientific || ''}</div>
+        <div class="gallery-meta">
+          <span class="classifier-badge">${icon} ${det.classifier}</span>
+          <span class="conf ${confClass(bestConf)}">${pct}%</span>
+        </div>
+      </div>
+    </div>`;
+}
+
+async function renderGallery() {
+  const n = Object.keys(state.gallery).length;
+  document.getElementById('main').innerHTML = `
+    <div class="card">
+      <div class="gallery-header">
+        <div class="card-title" style="margin:0">Species Gallery</div>
+        <div style="display:flex;align-items:center;gap:12px">
+          <span class="gallery-hint" id="gallery-count">${n ? `${n} species this session` : 'No species detected yet'}</span>
+          <button class="btn btn-sm btn-outline" onclick="renderGalleryManage()">⚙ Manage Images</button>
+        </div>
+      </div>
+      <div class="gallery-grid" id="gallery-grid"></div>
+    </div>
+  `;
+  await _loadGalleryCredits();
+  _populateGalleryGrid();
+}
+
+function _populateGalleryGrid() {
+  const grid = document.getElementById('gallery-grid');
+  if (!grid) return;
+  const entries = Object.values(state.gallery)
+    .sort((a, b) => a.det.species_common.localeCompare(b.det.species_common));
+  if (!entries.length) {
+    grid.innerHTML = '<div class="empty" style="padding:24px 0">No species detected yet this session — start a recording to see species appear here.</div>';
+    return;
+  }
+  grid.innerHTML = entries.map(e => galleryCard(e)).join('');
+}
+
+function updateGallery(det) {
+  const key = det.species_common;
+  const existing = state.gallery[key];
+  if (!existing) {
+    state.gallery[key] = { det, count: 1, bestConf: det.confidence };
+    _populateGalleryGrid();
+    const countEl = document.getElementById('gallery-count');
+    if (countEl) countEl.textContent = `${Object.keys(state.gallery).length} species this session`;
+  } else {
+    existing.count++;
+    if (det.confidence > existing.bestConf) existing.bestConf = det.confidence;
+    const el = document.getElementById(_galleryItemId(key));
+    if (el) {
+      const countBadge = el.querySelector('.gallery-count');
+      if (countBadge) countBadge.textContent = `×${existing.count}`;
+      const confEl = el.querySelector('.conf');
+      if (confEl) {
+        confEl.textContent = Math.round(existing.bestConf * 100) + '%';
+        confEl.className = `conf ${confClass(existing.bestConf)}`;
+      }
+    }
+  }
+}
+
+/* ── Gallery image management ── */
+async function renderGalleryManage() {
+  document.getElementById('main').innerHTML = `
+    <div class="card">
+      <div class="gallery-header">
+        <div class="card-title" style="margin:0">Manage Gallery Images</div>
+        <button class="btn btn-sm btn-outline" onclick="renderGallery()">← Back to Gallery</button>
+      </div>
+      <p style="font-size:0.82rem;color:var(--muted);margin-bottom:16px">
+        Upload your own photos to personalise the gallery for your monitoring location.
+        Edit author and licence fields to reflect the correct attribution for each image.
+        Stock images are sourced from Wikimedia Commons under Creative Commons licences.
+      </p>
+      <div id="manage-table"><div class="empty">Loading...</div></div>
+    </div>
+  `;
+  await _loadGalleryCredits();
+  await _renderManageTable();
+}
+
+async function _renderManageTable() {
+  const container = document.getElementById('manage-table');
+  if (!container) return;
+  let data;
+  try {
+    data = await api.get('/api/gallery');
+  } catch (err) {
+    container.innerHTML = `<div class="empty" style="color:var(--danger)">${err.message}</div>`;
+    return;
+  }
+  if (!data.images.length) {
+    container.innerHTML = '<div class="empty">No images installed yet.</div>';
+    return;
+  }
+  container.innerHTML = `
+    <table class="manage-table">
+      <thead>
+        <tr>
+          <th style="width:72px">Photo</th>
+          <th>Species</th>
+          <th>Author / Photographer</th>
+          <th>Licence</th>
+          <th style="width:140px">Actions</th>
+        </tr>
+      </thead>
+      <tbody>
+        ${data.images.map(img => _manageRow(img)).join('')}
+      </tbody>
+    </table>`;
+}
+
+function _manageRow(img) {
+  const key = img.key;
+  const author  = (img.author      || '').replace(/"/g, '&quot;');
+  const license = (img.license     || '').replace(/"/g, '&quot;');
+  const licUrl  = (img.license_url || '').replace(/"/g, '&quot;');
+  const srcUrl  = (img.source_url  || '').replace(/"/g, '&quot;');
+  const displayName = key.replace(/_/g, ' ').replace(/\b\w/g, c => c.toUpperCase());
+  return `
+    <tr id="mrow-${key}">
+      <td>
+        <img src="${img.url}" class="manage-thumb"
+             onerror="this.src='/species_images/_placeholder.svg';this.style.opacity='0.4'"
+             id="mthumb-${key}">
+      </td>
+      <td>
+        <div style="font-weight:600;font-size:0.85rem">${displayName}</div>
+        <div style="font-size:0.72rem;color:var(--muted);font-family:var(--mono)">${img.filename}</div>
+        ${srcUrl ? `<a href="${srcUrl}" target="_blank" rel="noopener" style="font-size:0.7rem;color:var(--primary)">View source ↗</a>` : ''}
+      </td>
+      <td>
+        <input class="manage-input" type="text" id="author-${key}"
+               value="${author}" placeholder="Photographer name">
+      </td>
+      <td>
+        <input class="manage-input" type="text" id="license-${key}"
+               value="${license}" placeholder="e.g. CC BY-SA 4.0" style="width:120px">
+        <input class="manage-input" type="text" id="licurl-${key}"
+               value="${licUrl}" placeholder="Licence URL" style="width:100%;margin-top:4px">
+      </td>
+      <td>
+        <div style="display:flex;flex-direction:column;gap:6px">
+          <button class="btn btn-sm btn-primary" onclick="_saveCredit('${key}', this)">Save</button>
+          <label class="btn btn-sm btn-outline" style="cursor:pointer;text-align:center">
+            Upload photo
+            <input type="file" accept="image/jpeg,image/png,image/webp" style="display:none"
+                   onchange="_uploadImage('${key}', this)">
+          </label>
+        </div>
+      </td>
+    </tr>`;
+}
+
+async function _saveCredit(key, btn) {
+  btnLoad(btn, '⟳');
+  const author      = document.getElementById(`author-${key}`)?.value  || '';
+  const license     = document.getElementById(`license-${key}`)?.value || '';
+  const license_url = document.getElementById(`licurl-${key}`)?.value  || '';
+  const source_url  = _galleryCredits[key + '.jpg']?.source_url || _galleryCredits[key + '.png']?.source_url || '';
+  try {
+    await api._request(`/api/gallery/${key}/credits`, {
+      method: 'PUT',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ author, license, license_url, source_url }),
+    });
+    _galleryCredits[key + '.jpg'] = { author, license, license_url, source_url };
+    toast('Credit saved', 'success');
+  } catch (err) {
+    toast(err.message, 'error');
+  }
+  btnDone(btn);
+}
+
+async function _uploadImage(key, input) {
+  const file = input.files[0];
+  if (!file) return;
+  const formData = new FormData();
+  formData.append('file', file);
+  try {
+    const r = await fetch(`/api/gallery/${key}/image`, { method: 'POST', body: formData });
+    if (!r.ok) { const b = await r.json().catch(() => ({})); throw new Error(b.detail || `Upload failed (${r.status})`); }
+    const result = await r.json();
+    // Refresh thumbnail with cache-busting
+    const thumb = document.getElementById(`mthumb-${key}`);
+    if (thumb) thumb.src = result.url + '?t=' + Date.now();
+    toast('Image uploaded — credits updated to reflect your own photograph', 'success', 5000);
+    // Pre-fill author with location name if credits are empty
+    const authorEl = document.getElementById(`author-${key}`);
+    if (authorEl && !authorEl.value) authorEl.value = 'Own photograph';
+    const licenseEl = document.getElementById(`license-${key}`);
+    if (licenseEl && !licenseEl.value) licenseEl.value = 'All rights reserved';
+  } catch (err) {
+    toast(err.message, 'error');
+  }
+}
 
 function ukDate(iso) {
   // Convert YYYY-MM-DD → DD/MM/YYYY

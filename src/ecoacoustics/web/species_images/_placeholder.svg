@@ -1,0 +1,10 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 160 120">
+  <rect width="160" height="120" fill="#152018"/>
+  <rect x="0" y="80" width="160" height="40" fill="#1e2e22"/>
+  <!-- Stylised tree silhouette -->
+  <polygon points="80,18 55,70 105,70" fill="#2a4030"/>
+  <polygon points="80,36 50,82 110,82" fill="#243828"/>
+  <rect x="72" y="80" width="16" height="18" fill="#2a4030"/>
+  <!-- Soft horizon line -->
+  <line x1="0" y1="80" x2="160" y2="80" stroke="#2a4030" stroke-width="1"/>
+</svg>

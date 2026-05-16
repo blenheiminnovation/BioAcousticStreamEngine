@@ -1,0 +1,572 @@
+{
+  "european_robin.jpg": {
+    "author": "Francis C. Franklin",
+    "license": "CC BY-SA 3.0",
+    "license_url": "https://creativecommons.org/licenses/by-sa/3.0",
+    "source_url": "https://commons.wikimedia.org/wiki/File:Erithacus_rubecula_with_cocked_head.jpg"
+  },
+  "eurasian_blue_tit.jpg": {
+    "author": "Unknown",
+    "license": "",
+    "license_url": "",
+    "source_url": "https://commons.wikimedia.org/wiki/File:Eurasian_blue_tit_%28Cyanistes_caeruleus_caeruleus%29_Biebrzanski.jpg"
+  },
+  "great_tit.jpg": {
+    "author": "Unknown",
+    "license": "",
+    "license_url": "",
+    "source_url": "https://commons.wikimedia.org/wiki/File:Great_tit_%28Parus_major%29%2C_Parc_du_Rouge-Cloitre%2C_For%C3%AAt_de_Soignes%2C_Brussels_%2826194636951%29.jpg"
+  },
+  "coal_tit.jpg": {
+    "author": "Alexis Lours",
+    "license": "CC BY 4.0",
+    "license_url": "https://creativecommons.org/licenses/by/4.0",
+    "source_url": "https://commons.wikimedia.org/wiki/File:Coal_Tit_2026_03_23.jpg"
+  },
+  "long_tailed_tit.jpg": {
+    "author": "Unknown",
+    "license": "",
+    "license_url": "",
+    "source_url": "https://commons.wikimedia.org/wiki/File:Long-tailed_tit_%2874940%29.jpg"
+  },
+  "marsh_tit.jpg": {
+    "author": "Sławek Staszczuk (photoss [AT] hotmail.co.uk)",
+    "license": "CC BY-SA 3.0",
+    "license_url": "http://creativecommons.org/licenses/by-sa/3.0/",
+    "source_url": "https://commons.wikimedia.org/wiki/File:Parus_palustris02.jpg"
+  },
+  "eurasian_blackbird.jpg": {
+    "author": "Andreas Trepte",
+    "license": "CC BY-SA 2.5",
+    "license_url": "https://creativecommons.org/licenses/by-sa/2.5",
+    "source_url": "https://commons.wikimedia.org/wiki/File:Common_Blackbird.jpg"
+  },
+  "song_thrush.jpg": {
+    "author": "Unknown",
+    "license": "",
+    "license_url": "",
+    "source_url": "https://commons.wikimedia.org/wiki/File:%D0%9F%D0%B5%D0%B2%D1%87%D0%B8%D0%B9_%D0%B4%D1%80%D0%BE%D0%B7%D0%B4_%D0%BD%D0%B0_%D0%BF%D0%B5%D0%BD%D1%8C%D0%BA%D0%B5_%28Turdus_philomelos%29%2C_%D0%91%D0%B8%D1%82%D1%86%D0%B5%D0%B2%D1%81%D0%BA%D0%B8%D0%B9_%D0%BB%D0%B5%D1%81.jpg"
+  },
+  "mistle_thrush.jpg": {
+    "author": "Fernando Losada Rodríguez",
+    "license": "CC BY-SA 4.0",
+    "license_url": "https://creativecommons.org/licenses/by-sa/4.0",
+    "source_url": "https://commons.wikimedia.org/wiki/File:Turdus_viscivorus.001_-_Cardiff.jpg"
+  },
+  "fieldfare.jpg": {
+    "author": "Unknown",
+    "license": "",
+    "license_url": "",
+    "source_url": "https://commons.wikimedia.org/wiki/File:Turdus_pilaris_EM1B9020_%2834450664312%29.jpg"
+  },
+  "redwing.jpg": {
+    "author": "Andreas Trepte",
+    "license": "CC BY-SA 2.5",
+    "license_url": "https://creativecommons.org/licenses/by-sa/2.5",
+    "source_url": "https://commons.wikimedia.org/wiki/File:Redwing_Turdus_iliacus.jpg"
+  },
+  "common_nightingale.jpg": {
+    "author": "Warrieboy",
+    "license": "CC BY-SA 4.0",
+    "license_url": "https://creativecommons.org/licenses/by-sa/4.0",
+    "source_url": "https://commons.wikimedia.org/wiki/File:Luscinia_megarhynchos_-_Common_nightingale_-_Nachtegaal.jpg"
+  },
+  "eurasian_blackcap.jpg": {
+    "author": "Unknown",
+    "license": "",
+    "license_url": "",
+    "source_url": "https://commons.wikimedia.org/wiki/File:Blackcap_%28Sylvia_atricapilla%29_male.jpg"
+  },
+  "garden_warbler.jpg": {
+    "author": "Unknown",
+    "license": "",
+    "license_url": "",
+    "source_url": "https://commons.wikimedia.org/wiki/File:Sylvia_borin_%28%C3%96rebro_County%29.jpg"
+  },
+  "common_chiffchaff.jpg": {
+    "author": "Alexis Lours",
+    "license": "CC BY 4.0",
+    "license_url": "https://creativecommons.org/licenses/by/4.0",
+    "source_url": "https://commons.wikimedia.org/wiki/File:Common_Chiffchaff_2025_04_04_01.jpg"
+  },
+  "willow_warbler.jpg": {
+    "author": "Andreas Trepte",
+    "license": "CC BY-SA 2.5",
+    "license_url": "https://creativecommons.org/licenses/by-sa/2.5",
+    "source_url": "https://commons.wikimedia.org/wiki/File:Willow_Warbler_Phylloscopus_trochilus.jpg"
+  },
+  "goldcrest.jpg": {
+    "author": "Francis C. Franklin",
+    "license": "CC BY-SA 3.0",
+    "license_url": "https://creativecommons.org/licenses/by-sa/3.0",
+    "source_url": "https://commons.wikimedia.org/wiki/File:Goldcrest_1.jpg"
+  },
+  "eurasian_wren.jpg": {
+    "author": "Alexis Lours",
+    "license": "CC BY 4.0",
+    "license_url": "https://creativecommons.org/licenses/by/4.0",
+    "source_url": "https://commons.wikimedia.org/wiki/File:Eurasian_wren_Franconville_02.jpg"
+  },
+  "dunnock.jpg": {
+    "author": "Unknown",
+    "license": "",
+    "license_url": "",
+    "source_url": "https://commons.wikimedia.org/wiki/File:Dunnock_%28Prunella_modularis%29_3.jpg"
+  },
+  "common_chaffinch.jpg": {
+    "author": "caroline legg",
+    "license": "CC BY 2.0",
+    "license_url": "https://creativecommons.org/licenses/by/2.0",
+    "source_url": "https://commons.wikimedia.org/wiki/File:Male_Chaffinch_-_Fringilla_coelebs.jpg"
+  },
+  "european_goldfinch.jpg": {
+    "author": "Giles Laurent",
+    "license": "CC BY-SA 4.0",
+    "license_url": "https://creativecommons.org/licenses/by-sa/4.0",
+    "source_url": "https://commons.wikimedia.org/wiki/File:072_Wild_European_goldfinch_at_the_Parc_Jura_vaudois_Photo_by_Giles_Laurent.jpg"
+  },
+  "eurasian_bullfinch.jpg": {
+    "author": "Francis Franklin",
+    "license": "CC BY-SA 3.0",
+    "license_url": "https://creativecommons.org/licenses/by-sa/3.0",
+    "source_url": "https://commons.wikimedia.org/wiki/File:Bullfinch_male.jpg"
+  },
+  "european_starling.jpg": {
+    "author": "PierreSelim",
+    "license": "CC BY-SA 3.0",
+    "license_url": "https://creativecommons.org/licenses/by-sa/3.0",
+    "source_url": "https://commons.wikimedia.org/wiki/File:Toulouse_-_Sturnus_vulgaris_-_2012-02-26_-_3.jpg"
+  },
+  "house_sparrow.jpg": {
+    "author": "Unknown",
+    "license": "",
+    "license_url": "",
+    "source_url": "https://commons.wikimedia.org/wiki/File:House_sparrow_male_in_Prospect_Park_%2853532%29.jpg"
+  },
+  "eurasian_nuthatch.jpg": {
+    "author": "Isiwal",
+    "license": "CC BY-SA 4.0",
+    "license_url": "https://creativecommons.org/licenses/by-sa/4.0",
+    "source_url": "https://commons.wikimedia.org/wiki/File:Kleiber_Sitta_europaea-0447.jpg"
+  },
+  "eurasian_treecreeper.jpg": {
+    "author": "Unknown",
+    "license": "",
+    "license_url": "",
+    "source_url": "https://commons.wikimedia.org/wiki/File:Eurasian_Treecreeper_-_Certhia_familiaris_%2854192274817%29.jpg"
+  },
+  "great_spotted_woodpecker.jpg": {
+    "author": "Unknown",
+    "license": "",
+    "license_url": "",
+    "source_url": "https://commons.wikimedia.org/wiki/File:Greater_Spotted_Woodpecker_%2841554059345%29.jpg"
+  },
+  "green_woodpecker.jpg": {
+    "author": "Unknown",
+    "license": "",
+    "license_url": "",
+    "source_url": "https://commons.wikimedia.org/wiki/File:European_green_woodpecker_%28Picus_viridis%29_female_Barnes.jpg"
+  },
+  "tawny_owl.jpg": {
+    "author": "Unknown",
+    "license": "",
+    "license_url": "",
+    "source_url": "https://commons.wikimedia.org/wiki/File:Strix_aluco_3_%28Martin_Mecnarowski%29.jpg"
+  },
+  "barn_owl.jpg": {
+    "author": "Unknown",
+    "license": "",
+    "license_url": "",
+    "source_url": "https://commons.wikimedia.org/wiki/File:American_Barn_Owl_%28Tyto_furcata_guatemalae%29%2C_Orange_Walk.jpg"
+  },
+  "little_owl.jpg": {
+    "author": "Unknown",
+    "license": "CC BY-SA 3.0",
+    "license_url": "http://creativecommons.org/licenses/by-sa/3.0/",
+    "source_url": "https://commons.wikimedia.org/wiki/File:Athene_noctua.jpg"
+  },
+  "european_nightjar.jpg": {
+    "author": "Unknown",
+    "license": "",
+    "license_url": "",
+    "source_url": "https://commons.wikimedia.org/wiki/File:%C5%9Eivanxap%C3%AEnok.jpg"
+  },
+  "eurasian_sparrowhawk.jpg": {
+    "author": "Unknown",
+    "license": "",
+    "license_url": "",
+    "source_url": "https://commons.wikimedia.org/wiki/File:%D0%AF%D1%81%D1%82%D1%80%D0%B5%D0%B1-%D0%BF%D0%B5%D1%80%D0%B5%D0%BF%D0%B5%D0%BB%D1%8F%D1%82%D0%BD%D0%B8%D0%BA_%28Accipiter_nisus%2C_m%29%2C_%D0%98%D0%B7%D0%BC%D0%B0%D0%B9%D0%BB%D0%BE%D0%B2%D1%81%D0%BA%D0%B8%D0%B9_%D0%BF%D0%B0%D1%80%D0%BA.jpg"
+  },
+  "common_buzzard.jpg": {
+    "author": "Unknown",
+    "license": "",
+    "license_url": "",
+    "source_url": "https://commons.wikimedia.org/wiki/File:Steppe_buzzard_%28Buteo_buteo_vulpinus%29.jpg"
+  },
+  "red_kite.jpg": {
+    "author": "Unknown",
+    "license": "",
+    "license_url": "",
+    "source_url": "https://commons.wikimedia.org/wiki/File:Milvus_milvus_R%28ThKraft%29.jpg"
+  },
+  "eurasian_kestrel.jpg": {
+    "author": "Andreas Trepte",
+    "license": "CC BY-SA 2.5",
+    "license_url": "https://creativecommons.org/licenses/by-sa/2.5",
+    "source_url": "https://commons.wikimedia.org/wiki/File:Common_kestrel_falco_tinnunculus.jpg"
+  },
+  "peregrine_falcon.jpg": {
+    "author": "Mykola Swarnyk",
+    "license": "CC BY-SA 3.0",
+    "license_url": "https://creativecommons.org/licenses/by-sa/3.0",
+    "source_url": "https://commons.wikimedia.org/wiki/File:Falco_peregrinus_m_Humber_Bay_Park_Toronto.jpg"
+  },
+  "eurasian_hobby.jpg": {
+    "author": "Unknown",
+    "license": "",
+    "license_url": "",
+    "source_url": "https://commons.wikimedia.org/wiki/File:Eurasian_hobby_%28Falco_subbuteo%29_by_Shantanu_Kuveskar.jpg"
+  },
+  "common_swift.jpg": {
+    "author": "Unknown",
+    "license": "",
+    "license_url": "",
+    "source_url": "https://commons.wikimedia.org/wiki/File:Common_Swift_2025_07_18_02_%28cropped%29.jpg"
+  },
+  "barn_swallow.jpg": {
+    "author": "Andreas Trepte",
+    "license": "CC BY-SA 2.5",
+    "license_url": "https://creativecommons.org/licenses/by-sa/2.5",
+    "source_url": "https://commons.wikimedia.org/wiki/File:Rauchschwalbe_Hirundo_rustica.jpg"
+  },
+  "common_house_martin.jpg": {
+    "author": "Andreas Trepte",
+    "license": "CC BY-SA 2.5",
+    "license_url": "https://creativecommons.org/licenses/by-sa/2.5",
+    "source_url": "https://commons.wikimedia.org/wiki/File:Mehlschwalbe_Delichon_urbicum.jpg"
+  },
+  "common_cuckoo.jpg": {
+    "author": "Unknown",
+    "license": "",
+    "license_url": "",
+    "source_url": "https://commons.wikimedia.org/wiki/File:Cuckoo_%2851169010335%29.jpg"
+  },
+  "eurasian_jackdaw.jpg": {
+    "author": "Unknown",
+    "license": "",
+    "license_url": "",
+    "source_url": "https://commons.wikimedia.org/wiki/File:Nordic_jackdaw_%2852563242448%29.jpg"
+  },
+  "eurasian_jay.jpg": {
+    "author": "Luc Viatour",
+    "license": "CC BY-SA 3.0",
+    "license_url": "http://creativecommons.org/licenses/by-sa/3.0/",
+    "source_url": "https://commons.wikimedia.org/wiki/File:Garrulus_glandarius_1_Luc_Viatour.jpg"
+  },
+  "eurasian_magpie.jpg": {
+    "author": "Unknown",
+    "license": "",
+    "license_url": "",
+    "source_url": "https://commons.wikimedia.org/wiki/File:Eurasian_magpie_%2810860%29.jpg"
+  },
+  "carrion_crow.jpg": {
+    "author": "Alexis Lours",
+    "license": "CC BY 4.0",
+    "license_url": "https://creativecommons.org/licenses/by/4.0",
+    "source_url": "https://commons.wikimedia.org/wiki/File:Carrion_crow_2022_04_05_05_02.jpg"
+  },
+  "rook.jpg": {
+    "author": "Unknown",
+    "license": "",
+    "license_url": "",
+    "source_url": "https://commons.wikimedia.org/wiki/File:Rook_at_Slimbridge_Wetland_Centre%2C_Gloucestershire%2C_England_22May2019_arp.jpg"
+  },
+  "common_raven.jpg": {
+    "author": "Juan Lacruz",
+    "license": "CC BY-SA 3.0",
+    "license_url": "https://creativecommons.org/licenses/by-sa/3.0",
+    "source_url": "https://commons.wikimedia.org/wiki/File:Corvus_corax.jpg"
+  },
+  "common_wood_pigeon.jpg": {
+    "author": "Unknown",
+    "license": "",
+    "license_url": "",
+    "source_url": "https://commons.wikimedia.org/wiki/File:Columba_palumbus_EM1B1397_%2827445478998%29.jpg"
+  },
+  "stock_dove.jpg": {
+    "author": "Unknown",
+    "license": "",
+    "license_url": "",
+    "source_url": "https://commons.wikimedia.org/wiki/File:Pigeon_colombin_%28Colulmba_oenas%29%2C_Parc_de_Woluwe%2C_Bruxelles_%2851921513878%29.jpg"
+  },
+  "eurasian_collared_dove.jpg": {
+    "author": "Unknown",
+    "license": "",
+    "license_url": "",
+    "source_url": "https://commons.wikimedia.org/wiki/File:2022-04-06_Streptopelia_decaocto%2C_Plovdiv%2C_Bulgaria_1.jpg"
+  },
+  "european_turtle_dove.jpg": {
+    "author": "Unknown",
+    "license": "",
+    "license_url": "",
+    "source_url": "https://commons.wikimedia.org/wiki/File:Turtle_dove_%28Streptopelia_turtur_turtur%29_Hungary.jpg"
+  },
+  "ring_necked_pheasant.jpg": {
+    "author": "Unknown",
+    "license": "",
+    "license_url": "",
+    "source_url": "https://commons.wikimedia.org/wiki/File:Pheasant_%28Phasianus_colchicus%29_%E2%99%82_%2851028701818%29.jpg"
+  },
+  "red_legged_partridge.jpg": {
+    "author": "Pierre Dalous",
+    "license": "CC BY-SA 3.0",
+    "license_url": "https://creativecommons.org/licenses/by-sa/3.0",
+    "source_url": "https://commons.wikimedia.org/wiki/File:Perdrix_rouge.jpg"
+  },
+  "spotted_flycatcher.jpg": {
+    "author": "Unknown",
+    "license": "",
+    "license_url": "",
+    "source_url": "https://commons.wikimedia.org/wiki/File:Muscicapa_striata_%D0%BC%D1%83%D1%85%D0%BE%D0%BB%D0%BE%D0%B2%D0%BA%D0%B0_%D1%81%D1%96%D1%80%D0%B0.jpg"
+  },
+  "european_pied_flycatcher.jpg": {
+    "author": "Unknown",
+    "license": "",
+    "license_url": "",
+    "source_url": "https://commons.wikimedia.org/wiki/File:Ficedula_hypoleuca_-Wood_of_Cree_Nature_Reserve%2C_Scotland_-male-8a.jpg"
+  },
+  "common_redstart.jpg": {
+    "author": "Unknown",
+    "license": "",
+    "license_url": "",
+    "source_url": "https://commons.wikimedia.org/wiki/File:Phoenicurus_phoenicurus_08%28js%29%2C_Lodz_%28Poland%29.jpg"
+  },
+  "mandarin_duck.jpg": {
+    "author": "Francis C. Franklin",
+    "license": "CC BY-SA 3.0",
+    "license_url": "https://creativecommons.org/licenses/by-sa/3.0",
+    "source_url": "https://commons.wikimedia.org/wiki/File:Pair_of_mandarin_ducks.jpg"
+  },
+  "mallard.jpg": {
+    "author": "This picture was realized by Richard Bartz by using a Canon EF 70-300mm f/4-5.6 IS USM Lens",
+    "license": "CC BY-SA 2.5",
+    "license_url": "https://creativecommons.org/licenses/by-sa/2.5",
+    "source_url": "https://commons.wikimedia.org/wiki/File:Anas_platyrhynchos_male_female_quadrat.jpg"
+  },
+  "gray_heron.jpg": {
+    "author": "Alexis Lours",
+    "license": "CC BY 4.0",
+    "license_url": "https://creativecommons.org/licenses/by/4.0",
+    "source_url": "https://commons.wikimedia.org/wiki/File:Grey_heron_2022_03_18_01.jpg"
+  },
+  "mute_swan.jpg": {
+    "author": "Geni",
+    "license": "CC BY-SA 4.0",
+    "license_url": "https://creativecommons.org/licenses/by-sa/4.0",
+    "source_url": "https://commons.wikimedia.org/wiki/File:Mute_Swan_Emsworth2.JPG"
+  },
+  "canada_goose.jpg": {
+    "author": "Rror",
+    "license": "CC BY-SA 3.0",
+    "license_url": "https://creativecommons.org/licenses/by-sa/3.0",
+    "source_url": "https://commons.wikimedia.org/wiki/File:Canada_goose.jpg"
+  },
+  "common_kingfisher.jpg": {
+    "author": "Unknown",
+    "license": "",
+    "license_url": "",
+    "source_url": "https://commons.wikimedia.org/wiki/File:Alcedo_atthis_-England-8_%28cropped%29.jpg"
+  },
+  "eurasian_skylark.jpg": {
+    "author": "Unknown",
+    "license": "",
+    "license_url": "",
+    "source_url": "https://commons.wikimedia.org/wiki/File:Skylark_2%2C_Lake_District%2C_England_-_June_2009.jpg"
+  },
+  "common_firecrest.jpg": {
+    "author": "Alexis Lours",
+    "license": "CC BY 4.0",
+    "license_url": "https://creativecommons.org/licenses/by/4.0",
+    "source_url": "https://commons.wikimedia.org/wiki/File:Common_firecrest_Franconville_03.jpg"
+  },
+  "yellowhammer.jpg": {
+    "author": "Andreas Trepte",
+    "license": "CC BY-SA 2.5",
+    "license_url": "https://creativecommons.org/licenses/by-sa/2.5",
+    "source_url": "https://commons.wikimedia.org/wiki/File:Goldammer_Emberiza_citrinella.jpg"
+  },
+  "reed_bunting.jpg": {
+    "author": "Unknown",
+    "license": "",
+    "license_url": "",
+    "source_url": "https://commons.wikimedia.org/wiki/File:Reed_Bunting_-_Emberiza_schoeniclus_%2852015951301%29.jpg"
+  },
+  "eurasian_curlew.jpg": {
+    "author": "Andreas Trepte",
+    "license": "CC BY-SA 2.5",
+    "license_url": "https://creativecommons.org/licenses/by-sa/2.5",
+    "source_url": "https://commons.wikimedia.org/wiki/File:Eurasian_Curlew.jpg"
+  },
+  "common_ringed_plover.jpg": {
+    "author": "Unknown",
+    "license": "",
+    "license_url": "",
+    "source_url": "https://commons.wikimedia.org/wiki/File:Common_ringed_plover_%28Charadrius_hiaticula%29_Oppdal.jpg"
+  },
+  "common_shelduck.jpg": {
+    "author": "Unknown",
+    "license": "",
+    "license_url": "",
+    "source_url": "https://commons.wikimedia.org/wiki/File:Common_Shellduck_%28Tadorna_tadorna%29_%2826499348215%29.jpg"
+  },
+  "rock_pigeon.jpg": {
+    "author": "Unknown",
+    "license": "",
+    "license_url": "",
+    "source_url": "https://commons.wikimedia.org/wiki/File:Columba_livia_%28Rock_Dove%2C_wild%29%2C_Duncansby_Head%2C_Caithness%2C_Scotland_1.jpg"
+  },
+  "field_grasshopper.jpg": {
+    "author": "Alvesgaspar",
+    "license": "CC BY-SA 3.0",
+    "license_url": "https://creativecommons.org/licenses/by-sa/3.0",
+    "source_url": "https://commons.wikimedia.org/wiki/File:Grasshopper_April_2008-3.jpg"
+  },
+  "meadow_grasshopper.jpg": {
+    "author": "G.-U. Tolkiehn",
+    "license": "CC BY 2.5",
+    "license_url": "https://creativecommons.org/licenses/by/2.5",
+    "source_url": "https://commons.wikimedia.org/wiki/File:Chorthippus_parallelus_1944.jpg"
+  },
+  "common_green_grasshopper.jpg": {
+    "author": "James K. Lindsey",
+    "license": "CC BY-SA 3.0",
+    "license_url": "https://creativecommons.org/licenses/by-sa/3.0",
+    "source_url": "https://commons.wikimedia.org/wiki/File:Omocestus.viridulus.female.jpg"
+  },
+  "great_green_bush_cricket.jpg": {
+    "author": "Unknown",
+    "license": "",
+    "license_url": "",
+    "source_url": "https://commons.wikimedia.org/wiki/File:%28MHNT%29_Tettigonia_viridissima_on_Avena_fatua.jpg"
+  },
+  "roesels_bush_cricket.jpg": {
+    "author": "Richard Bartz, Munich aka Makro Freak",
+    "license": "CC BY-SA 2.5",
+    "license_url": "https://creativecommons.org/licenses/by-sa/2.5",
+    "source_url": "https://commons.wikimedia.org/wiki/File:Metrioptera_roeseli_male_Richard_Bartz.jpg"
+  },
+  "dark_bush_cricket.jpg": {
+    "author": "Hectonichus",
+    "license": "CC BY-SA 3.0",
+    "license_url": "https://creativecommons.org/licenses/by-sa/3.0",
+    "source_url": "https://commons.wikimedia.org/wiki/File:Tettigoniidae_-_Pholidoptera_griseoaptera.JPG"
+  },
+  "speckled_bush_cricket.jpg": {
+    "author": "Fritz Geller-Grimm",
+    "license": "CC BY-SA 2.5",
+    "license_url": "https://creativecommons.org/licenses/by-sa/2.5",
+    "source_url": "https://commons.wikimedia.org/wiki/File:Leptophyes_punctatissima_fg06.jpg"
+  },
+  "oak_bush_cricket.jpg": {
+    "author": "Unknown",
+    "license": "Attribution",
+    "license_url": "",
+    "source_url": "https://commons.wikimedia.org/wiki/File:Meconema_thalassinum01.jpg"
+  },
+  "common_pipistrelle.jpg": {
+    "author": "Drahkrub",
+    "license": "CC BY-SA 4.0",
+    "license_url": "https://creativecommons.org/licenses/by-sa/4.0",
+    "source_url": "https://commons.wikimedia.org/wiki/File:Pipistrellus_female-1.jpg"
+  },
+  "soprano_pipistrelle.jpg": {
+    "author": "Evgeniy Yakhontov",
+    "license": "CC BY-SA 3.0",
+    "license_url": "https://creativecommons.org/licenses/by-sa/3.0",
+    "source_url": "https://commons.wikimedia.org/wiki/File:Pipistrellus_pygmaeus01.jpg"
+  },
+  "nathusius_pipistrelle.jpg": {
+    "author": "Mnolf",
+    "license": "CC BY-SA 3.0",
+    "license_url": "http://creativecommons.org/licenses/by-sa/3.0/",
+    "source_url": "https://commons.wikimedia.org/wiki/File:Pipistrellus_nathusii.jpg"
+  },
+  "brown_long_eared_bat.jpg": {
+    "author": "Unknown",
+    "license": "",
+    "license_url": "",
+    "source_url": "https://commons.wikimedia.org/wiki/File:Plecotus_auritus_2013-2_%28cropped%29.jpg"
+  },
+  "daubentons_bat.jpg": {
+    "author": "Gilles San Martin from Namur, Belgium",
+    "license": "CC BY-SA 2.0",
+    "license_url": "https://creativecommons.org/licenses/by-sa/2.0",
+    "source_url": "https://commons.wikimedia.org/wiki/File:Myotis_daubentoni01.jpg"
+  },
+  "noctule.jpg": {
+    "author": "Mnolf",
+    "license": "CC BY-SA 3.0",
+    "license_url": "http://creativecommons.org/licenses/by-sa/3.0/",
+    "source_url": "https://commons.wikimedia.org/wiki/File:Nyctalus_noctula.jpg"
+  },
+  "serotine.jpg": {
+    "author": "Mnolf",
+    "license": "CC BY-SA 3.0",
+    "license_url": "http://creativecommons.org/licenses/by-sa/3.0/",
+    "source_url": "https://commons.wikimedia.org/wiki/File:Eptesicus_serotinus.jpg"
+  },
+  "barbastelle.jpg": {
+    "author": "C. Robiller / Naturlichter.de",
+    "license": "CC BY-SA 3.0",
+    "license_url": "https://creativecommons.org/licenses/by-sa/3.0",
+    "source_url": "https://commons.wikimedia.org/wiki/File:Barbastella_barbastellus_01.jpg"
+  },
+  "greater_horseshoe_bat.jpg": {
+    "author": "Unknown",
+    "license": "",
+    "license_url": "",
+    "source_url": "https://commons.wikimedia.org/wiki/File:Greater_horseshoe_bat_%28Rhinolophus_ferrumequinum%29_Hrdovicka.jpg"
+  },
+  "lesser_horseshoe_bat.jpg": {
+    "author": "Unknown",
+    "license": "",
+    "license_url": "",
+    "source_url": "https://commons.wikimedia.org/wiki/File:Bat%2820070605%29.jpg"
+  },
+  "honey_bee.jpg": {
+    "author": "Andreas Trepte",
+    "license": "CC BY-SA 2.5",
+    "license_url": "https://creativecommons.org/licenses/by-sa/2.5",
+    "source_url": "https://commons.wikimedia.org/wiki/File:Apis_mellifera_Western_honey_bee.jpg"
+  },
+  "buff_tailed_bumblebee.jpg": {
+    "author": "Marco Almbauer",
+    "license": "CC0",
+    "license_url": "http://creativecommons.org/publicdomain/zero/1.0/deed.en",
+    "source_url": "https://commons.wikimedia.org/wiki/File:Bombus_terrestris.jpg"
+  },
+  "tree_bumblebee.jpg": {
+    "author": "Unknown",
+    "license": "",
+    "license_url": "",
+    "source_url": "https://commons.wikimedia.org/wiki/File:Tree_bumblebee_%28Bombus_hypnorum%29.jpg"
+  },
+  "red_tailed_bumblebee.jpg": {
+    "author": "Ivar Leidus",
+    "license": "CC BY-SA 4.0",
+    "license_url": "https://creativecommons.org/licenses/by-sa/4.0",
+    "source_url": "https://commons.wikimedia.org/wiki/File:Bombus_lapidarius_queen_-_Echium_vulgare_-_Keila.jpg"
+  },
+  "white_tailed_bumblebee.jpg": {
+    "author": "Ivar Leidus",
+    "license": "CC BY-SA 4.0",
+    "license_url": "https://creativecommons.org/licenses/by-sa/4.0",
+    "source_url": "https://commons.wikimedia.org/wiki/File:Bombus_lucorum_-_Centaurea_scabiosa_-_Keila.JPG"
+  },
+  "common_carder_bee.jpg": {
+    "author": "Unknown",
+    "license": "",
+    "license_url": "",
+    "source_url": "https://commons.wikimedia.org/wiki/File:Bombus_pascuorum_female_2_%28aka%29.jpg"
+  }
+}

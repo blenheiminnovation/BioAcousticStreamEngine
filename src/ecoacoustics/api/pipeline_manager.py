@@ -10,6 +10,7 @@ Author: David Green, Blenheim Palace
 
 import asyncio
 import logging
+import re
 import threading
 import time
 from datetime import datetime
@@ -245,6 +246,7 @@ class PipelineManager:
             "classifier": det.classifier,
             "species_common": det.label,
             "species_scientific": det.metadata.get("scientific_name", ""),
+            "species_image": re.sub(r"[^a-z0-9]+", "_", det.label.lower().replace("'", "")).strip("_") + ".jpg",
             "confidence": round(det.confidence, 4),
             "call_number_in_session": call_n,
             "device_name": self._device_name,

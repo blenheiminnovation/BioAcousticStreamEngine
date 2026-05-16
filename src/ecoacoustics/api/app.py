@@ -19,7 +19,7 @@ from fastapi.staticfiles import StaticFiles
 
 from ecoacoustics.api import state
 from ecoacoustics.api.pipeline_manager import PipelineManager
-from ecoacoustics.api.routes import clips, detections, devices, reports, schedule, settings, status
+from ecoacoustics.api.routes import clips, detections, devices, gallery, reports, schedule, settings, status
 
 CONFIG_PATH = "config/settings.yaml"
 
@@ -61,6 +61,7 @@ app.include_router(clips.router, prefix="/api")
 app.include_router(reports.router, prefix="/api")
 app.include_router(devices.router, prefix="/api")
 app.include_router(settings.router, prefix="/api")
+app.include_router(gallery.router, prefix="/api")
 
 
 # ── WebSocket — must be before the StaticFiles mount ──
