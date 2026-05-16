@@ -2,6 +2,7 @@ audio:
   channels: 1
   chunk_duration: 3.0
   device: null
+  gain_db: 6.0
   max_queue_size: 20
 bat:
   capture_rate: 256000
