@@ -767,7 +767,7 @@ async function loadClassifierDevices() {
     const deviceOptions = (selected) => {
       const none = `<option value="" ${!selected ? 'selected' : ''}>System default</option>`;
       const opts = devData.devices.map(d =>
-        `<option value="${d.index}" ${String(selected) === String(d.index) ? 'selected' : ''}>${d.label || d.name}</option>`
+        `<option value="${d.name}" ${selected === d.name ? 'selected' : ''}>${d.label || d.name}</option>`
       ).join('');
       return none + opts;
     };
@@ -815,7 +815,7 @@ async function saveClassifiers() {
   const devices = {};
   for (const key of ['bird', 'bat', 'bee', 'insect', 'soil']) {
     const val = document.getElementById(`clf-device-${key}`)?.value;
-    devices[key] = val === '' ? null : (isNaN(parseInt(val)) ? val : parseInt(val));
+    devices[key] = val === '' ? null : val;
   }
   try {
     await api.post('/api/settings/classifiers', { active, devices });

@@ -9,13 +9,70 @@ are dropped rather than consuming unbounded memory.
 Author: David Green, Blenheim Palace
 """
 
+import logging
+import os
 import queue
+import subprocess
 import threading
 import time
 from dataclasses import dataclass
 from typing import Optional
 
 import numpy as np
+
+_log = logging.getLogger(__name__)
+
+
+def _resolve_device(device):
+    """Translate a device identifier to one sounddevice can open.
+
+    Handles three cases that arise on Linux with PipeWire/PulseAudio:
+    - None              → None (system default)
+    - Small int         → valid sounddevice index, pass through
+    - Large int         → PipeWire source numeric ID (unstable, changes on replug);
+                          resolved to source name via pactl, then routed through pulse
+    - PipeWire name str → alsa_input.*/alsa_output.*/bluez_* source name;
+                          PULSE_SOURCE env var is set and "pulse" is used as the device
+    - Other str         → passed through (ALSA hw:x,x names etc.)
+    """
+    if device is None:
+        return None
+
+    import sounddevice as sd
+
+    if isinstance(device, int):
+        try:
+            if 0 <= device < len(sd.query_devices()):
+                return device
+        except Exception:
+            pass
+        # Treat as a PipeWire source numeric ID — resolve to name
+        try:
+            out = subprocess.check_output(
+                ["pactl", "list", "short", "sources"], text=True, timeout=5
+            )
+            for line in out.splitlines():
+                parts = line.split("\t")
+                if len(parts) >= 2 and parts[0].strip() == str(device):
+                    device = parts[1].strip()
+                    _log.info("AudioCapture: resolved PipeWire source %d → %s", int(parts[0]), device)
+                    break
+            else:
+                _log.warning("AudioCapture: PipeWire source %d not found; falling back to system default", device)
+                return None
+        except Exception as exc:
+            _log.warning("AudioCapture: could not resolve device %r via pactl (%s); falling back to system default", device, exc)
+            return None
+
+    # device is now a string
+    if isinstance(device, str) and any(
+        device.startswith(p) for p in ("alsa_input.", "alsa_output.", "bluez_", "alsa_card.")
+    ):
+        os.environ["PULSE_SOURCE"] = device
+        _log.debug("AudioCapture: routing source '%s' through pulse", device)
+        return "pulse"
+
+    return device
 
 # How many 3-second chunks to buffer before dropping. At 3s/chunk this is
 # ~60s of headroom for the classifier to catch up before we start losing audio.
@@ -91,6 +148,7 @@ class AudioCapture:
     def start(self) -> None:
         """Open the sounddevice input stream, retrying up to 3 times on transient errors."""
         import sounddevice as sd
+        resolved_device = _resolve_device(self.device)
         last_exc: Optional[Exception] = None
         for attempt in range(3):
             try:
@@ -98,7 +156,7 @@ class AudioCapture:
                     samplerate=self.sample_rate,
                     channels=self.channels,
                     dtype="float32",
-                    device=self.device,
+                    device=resolved_device,
                     callback=self._callback,
                 )
                 self._stream.start()
