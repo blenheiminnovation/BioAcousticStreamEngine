@@ -143,6 +143,7 @@ class Pipeline:
                 target_sample_rate=clf.sample_rate,
                 freq_min_hz=clf.freq_min_hz,
                 freq_max_hz=clf.freq_max_hz,
+                gain_db=self._cfg["audio"].get("gain_db", 0.0),
             )
 
     # ------------------------------------------------------------------

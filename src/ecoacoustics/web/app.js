@@ -424,6 +424,11 @@ function confClass(c) { return c >= 0.75 ? 'conf-high' : c >= 0.5 ? 'conf-mid' :
 
 // Credits cache: filename → { author, license, license_url, source_url }
 let _galleryCredits = {};
+let _galleryMinConf = 0;   // 0–1 fraction; persists across live updates and re-renders
+
+function _galleryFilterLabel(pct) {
+  return pct === 0 ? 'Any' : `${pct}%+`;
+}
 
 async function _loadGalleryCredits() {
   try {
@@ -483,13 +488,23 @@ function galleryCard(entry) {
 }
 
 async function renderGallery() {
-  const n = Object.keys(state.gallery).length;
+  const confPct = Math.round(_galleryMinConf * 100);
   document.getElementById('main').innerHTML = `
     <div class="card">
       <div class="gallery-header">
         <div class="card-title" style="margin:0">Species Gallery</div>
-        <div style="display:flex;align-items:center;gap:12px">
-          <span class="gallery-hint" id="gallery-count">${n ? `${n} species this session` : 'No species detected yet'}</span>
+        <div style="display:flex;align-items:center;gap:12px;flex-wrap:wrap">
+          <span class="gallery-hint" id="gallery-count"></span>
+          <div class="gallery-filter">
+            <span class="gallery-filter-label">Min confidence: <strong id="gallery-conf-label">${_galleryFilterLabel(confPct)}</strong></span>
+            <input type="range" class="gallery-conf-slider" id="gallery-conf-slider"
+              min="0" max="95" step="5" value="${confPct}"
+              oninput="
+                _galleryMinConf = this.value / 100;
+                document.getElementById('gallery-conf-label').textContent = _galleryFilterLabel(+this.value);
+                _populateGalleryGrid();
+              ">
+          </div>
           <button class="btn btn-sm btn-outline" onclick="renderGalleryManage()">⚙ Manage Images</button>
         </div>
       </div>
@@ -503,10 +518,26 @@ async function renderGallery() {
 function _populateGalleryGrid() {
   const grid = document.getElementById('gallery-grid');
   if (!grid) return;
-  const entries = Object.values(state.gallery)
+  const all = Object.values(state.gallery);
+  const entries = all
+    .filter(e => e.bestConf >= _galleryMinConf)
     .sort((a, b) => a.det.species_common.localeCompare(b.det.species_common));
+
+  const countEl = document.getElementById('gallery-count');
+  if (countEl) {
+    if (!all.length) {
+      countEl.textContent = 'No species detected yet';
+    } else if (entries.length === all.length) {
+      countEl.textContent = `${all.length} species this session`;
+    } else {
+      countEl.textContent = `${entries.length} of ${all.length} species`;
+    }
+  }
+
   if (!entries.length) {
-    grid.innerHTML = '<div class="empty" style="padding:24px 0">No species detected yet this session — start a recording to see species appear here.</div>';
+    grid.innerHTML = all.length
+      ? '<div class="empty" style="padding:24px 0">No species above the confidence threshold — try lowering the filter.</div>'
+      : '<div class="empty" style="padding:24px 0">No species detected yet this session — start a recording to see species appear here.</div>';
     return;
   }
   grid.innerHTML = entries.map(e => galleryCard(e)).join('');
@@ -518,8 +549,6 @@ function updateGallery(det) {
   if (!existing) {
     state.gallery[key] = { det, count: 1, bestConf: det.confidence };
     _populateGalleryGrid();
-    const countEl = document.getElementById('gallery-count');
-    if (countEl) countEl.textContent = `${Object.keys(state.gallery).length} species this session`;
   } else {
     existing.count++;
     if (det.confidence > existing.bestConf) existing.bestConf = det.confidence;

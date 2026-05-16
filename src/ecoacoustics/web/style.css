@@ -562,6 +562,21 @@ tr:hover td { background: var(--surface2); }
   font-size: 0.78rem;
   color: var(--muted);
 }
+.gallery-filter {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+.gallery-filter-label {
+  font-size: 0.78rem;
+  color: var(--muted);
+  white-space: nowrap;
+}
+.gallery-conf-slider {
+  width: 120px;
+  accent-color: var(--primary);
+  cursor: pointer;
+}
 .gallery-grid {
   display: grid;
   grid-template-columns: repeat(5, 1fr);

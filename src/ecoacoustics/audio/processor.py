@@ -31,19 +31,22 @@ class AudioProcessor:
         target_sample_rate: int,
         freq_min_hz: Optional[int] = None,
         freq_max_hz: Optional[int] = None,
+        gain_db: float = 0.0,
     ):
         """
         Args:
             target_sample_rate: Sample rate the classifier expects (Hz).
             freq_min_hz: Lower edge of the bandpass filter (Hz). None = no high-pass.
             freq_max_hz: Upper edge of the bandpass filter (Hz). None = no low-pass.
+            gain_db: Software gain applied before classification (dB). 0 = no change.
         """
         self.target_sample_rate = target_sample_rate
         self.freq_min_hz = freq_min_hz
         self.freq_max_hz = freq_max_hz
+        self._gain_linear = 10.0 ** (gain_db / 20.0)
 
     def process(self, chunk: AudioChunk) -> AudioChunk:
-        """Resample then bandpass-filter the chunk.
+        """Resample, apply gain, then bandpass-filter the chunk.
 
         Returns a new AudioChunk at target_sample_rate.  The original chunk
         is not modified.
@@ -52,6 +55,9 @@ class AudioProcessor:
 
         if chunk.sample_rate != self.target_sample_rate:
             audio = self._resample(audio, chunk.sample_rate, self.target_sample_rate)
+
+        if self._gain_linear != 1.0:
+            audio = np.clip(audio * self._gain_linear, -1.0, 1.0)
 
         if self.freq_min_hz or self.freq_max_hz:
             audio = self._bandpass(audio, self.target_sample_rate)

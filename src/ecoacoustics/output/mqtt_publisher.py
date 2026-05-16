@@ -12,8 +12,9 @@ Payload (JSON):
     "date": "2026-05-01",
     "time": "05:23:11",
     "classifier": "bird",
-    "species_common": "Robin",
+    "species_common": "European Robin",
     "species_scientific": "Erithacus rubecula",
+    "species_image": "european_robin.jpg",
     "confidence": 0.873,
     "call_number_in_session": 3,
     "latitude": 51.8403,
@@ -26,6 +27,7 @@ Author: David Green, Blenheim Palace
 import datetime
 import json
 import logging
+import re
 import ssl
 
 import paho.mqtt.client as mqtt
@@ -89,6 +91,7 @@ class MqttPublisher:
             "classifier": det.classifier,
             "species_common": det.label,
             "species_scientific": det.metadata.get("scientific_name", ""),
+            "species_image": re.sub(r"[^a-z0-9]+", "_", det.label.lower().replace("'", "")).strip("_") + ".jpg",
             "confidence": round(det.confidence, 4),
             "call_number_in_session": call_n,
             "location_name": self._location_name,
