@@ -467,6 +467,18 @@ function galleryCard(entry) {
   const pct = Math.round(bestConf * 100);
   const clf = CLASSIFIERS.find(c => c.key === det.classifier);
   const icon = clf ? clf.icon : '◈';
+  const key = _speciesKey(det.species_common);
+  const hasImage = !!(
+    _galleryCredits[key + '.jpg'] ||
+    _galleryCredits[key + '.png'] ||
+    _galleryCredits[key + '.webp']
+  );
+  const uploadBtn = hasImage ? '' : `
+    <label class="gallery-upload-btn" title="Upload a photo for ${det.species_common}">
+      + Add photo
+      <input type="file" accept="image/jpeg,image/png,image/webp" style="display:none"
+             onchange="_uploadFromCard('${key}', this)">
+    </label>`;
   return `
     <div class="gallery-item" id="${_galleryItemId(det.species_common)}">
       <div class="gallery-img-wrap">
@@ -474,6 +486,7 @@ function galleryCard(entry) {
              onerror="this.onerror=null;this.src='/species_images/_placeholder.svg';this.classList.add('gallery-placeholder')"
              loading="lazy" alt="${det.species_common}">
         <span class="gallery-count">×${count}</span>
+        ${uploadBtn}
         ${_creditLine(det.species_common)}
       </div>
       <div class="gallery-info">
@@ -485,6 +498,22 @@ function galleryCard(entry) {
         </div>
       </div>
     </div>`;
+}
+
+async function _uploadFromCard(key, input) {
+  const file = input.files[0];
+  if (!file) return;
+  const formData = new FormData();
+  formData.append('file', file);
+  try {
+    const r = await fetch(`/api/gallery/${key}/image`, { method: 'POST', body: formData });
+    if (!r.ok) { const b = await r.json().catch(() => ({})); throw new Error(b.detail || `Upload failed (${r.status})`); }
+    await _loadGalleryCredits();
+    _populateGalleryGrid();
+    toast('Photo added', 'success', 4000);
+  } catch (err) {
+    toast(err.message, 'error');
+  }
 }
 
 async function renderGallery() {

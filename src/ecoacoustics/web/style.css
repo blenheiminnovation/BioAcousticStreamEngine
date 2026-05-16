@@ -611,6 +611,25 @@ tr:hover td { background: var(--surface2); }
 .gallery-img-wrap img.gallery-placeholder {
   opacity: 0.35;
 }
+.gallery-upload-btn {
+  position: absolute;
+  bottom: 24px;
+  left: 50%;
+  transform: translateX(-50%);
+  background: var(--primary);
+  color: #fff;
+  font-size: 0.7rem;
+  font-weight: 600;
+  padding: 4px 12px;
+  border-radius: 12px;
+  cursor: pointer;
+  white-space: nowrap;
+  transition: filter 0.15s;
+  user-select: none;
+}
+.gallery-upload-btn:hover {
+  filter: brightness(1.15);
+}
 .gallery-count {
   position: absolute;
   top: 6px;
